@@ -91,16 +91,23 @@ object LiftNettyCookies extends Loggable {
               jsessionId <- jsessionCookie.value
               hsessionId <- hsessionCookie.value
               hsessionIdCheck <- hashSessionId(jsessionId)
-              checksumMatched <- if (hsessionId.equals(hsessionIdCheck)) None else Some(true)
-              // validatedAgainstLift <- SessionMaster.getSession(Full(jsessionId))
-            } yield jsessionId
+            } yield {
+              // if the check is correct, use the given sessionID, otherwise create a new one
+              // TODO check against SessionMaster.getSession(Full(jsessionId)) ?
+              if (hsessionId.equals(hsessionIdCheck)) jsessionId
+              else java.util.UUID.randomUUID.toString
+            }
           case _ =>
             for {
               jsessionId <- jsessionCookie.value
             } yield jsessionId
         }
-      case _ => Empty
+      case _ => Full(java.util.UUID.randomUUID.toString)
     }
+  }
+
+  def start() {
+    logger.info("Cookie Manager started")
   }
 
 }

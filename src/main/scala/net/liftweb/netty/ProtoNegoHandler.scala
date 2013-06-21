@@ -66,7 +66,7 @@ object ProtoNegoHandler extends ByteToMessageDecoder {
         p.addLast("aggregator", new HttpObjectAggregator(maxContentLength))
         p.addLast("encoder", new HttpResponseEncoder())
         if (detectGzip) p.addLast("deflater", new HttpContentCompressor())
-        p.addLast("requestHandler", new NettyRequestHandler)
+        p.addLast("requestHandler", NettyRequestHandler)
         buffer.retain
         p.remove(this)
 

@@ -10,8 +10,8 @@ import net.liftweb.http.{LiftSession, LiftRules, LiftServlet}
 /**
  * Handles incoming requests which will be sent to an AuthActor
  */
-//@ChannelHandler.Sharable
-class NettyRequestHandler extends ChannelInboundHandlerAdapter {
+@ChannelHandler.Sharable
+object NettyRequestHandler extends ChannelInboundHandlerAdapter {
 
   val context = new NettyHttpContext
   val liftLand = new LiftServlet(context)

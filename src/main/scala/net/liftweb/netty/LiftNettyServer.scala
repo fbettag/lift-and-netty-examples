@@ -35,6 +35,7 @@ object LiftNettyServer extends App with HTTPProvider { APP =>
         }
       })
     bootLift(Empty)
+    LiftNettyCookies.start()
     srv.bind().syncUninterruptibly()
     println("Listening on %s:%s".format(addr.getAddress.getHostAddress, addr.getPort))
         // Add Shutdown Hook to cleanly shutdown Netty
