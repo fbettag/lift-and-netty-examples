@@ -7,8 +7,9 @@ import io.netty.channel.socket.nio.NioServerSocketChannel
 import io.netty.channel.socket.SocketChannel
 import java.net.InetSocketAddress
 import net.liftweb.common.Empty
+import net.liftweb.http.provider.{HTTPProvider, HTTPRequest, HTTPResponse}
 
-object LiftNettyServer extends App { APP =>
+object LiftNettyServer extends App with HTTPProvider { APP =>
   private var loopGroup1: Option[NioEventLoopGroup] = None
   private var loopGroup2: Option[NioEventLoopGroup] = None
 
@@ -21,7 +22,7 @@ object LiftNettyServer extends App { APP =>
     loopGroup2 = Some(new NioEventLoopGroup)
     val srv = new ServerBootstrap
     val addr = new InetSocketAddress(port)
-    val chan = srv.group(loopGroup1.get, loopGroup2.get)
+    srv.group(loopGroup1.get, loopGroup2.get)
       .localAddress(addr)
       .channel(classOf[NioServerSocketChannel])
       .childOption[java.lang.Boolean](ChannelOption.TCP_NODELAY, true)
@@ -33,6 +34,7 @@ object LiftNettyServer extends App { APP =>
           ch.pipeline.addLast("nego", ProtoNegoHandler)
         }
       })
+    bootLift(Empty)
     srv.bind().syncUninterruptibly()
     println("Listening on %s:%s".format(addr.getAddress.getHostAddress, addr.getPort))
         // Add Shutdown Hook to cleanly shutdown Netty
@@ -44,11 +46,15 @@ object LiftNettyServer extends App { APP =>
     srv
   }
 
+  val context = new NettyHttpContext
+  def liftService(req : HTTPRequest, resp : HTTPResponse)(chain : => Unit) = super.service(req, resp)(chain)
+
   def stop() {
     loopGroup1.map(_.shutdownGracefully())
     loopGroup2.map(_.shutdownGracefully())
     loopGroup1 = None
     loopGroup2 = None
+    terminate
     println("Shutdown complete")
   }
 }

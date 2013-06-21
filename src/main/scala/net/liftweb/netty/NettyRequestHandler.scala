@@ -11,11 +11,10 @@ import net.liftweb.http.{LiftSession, LiftRules, LiftServlet}
  * Handles incoming requests which will be sent to an AuthActor
  */
 //@ChannelHandler.Sharable
-class NettyRequestHandler extends ChannelInboundHandlerAdapter with HTTPProvider {
+class NettyRequestHandler extends ChannelInboundHandlerAdapter {
 
   val context = new NettyHttpContext
   val liftLand = new LiftServlet(context)
-  bootLift(Empty)
 
   private def findObject(cls: String): Box[AnyRef] =
     Helpers.tryo[Class[_]](Nil)(Class.forName(cls + "$")).flatMap {
@@ -71,10 +70,10 @@ class NettyRequestHandler extends ChannelInboundHandlerAdapter with HTTPProvider
           try {
             transientVarProvider(Empty,
               reqVarProvider(Empty, {
-                val httpRequest: HTTPRequest = new NettyHttpRequest(req, ctx.channel, context, this)
+                val httpRequest: HTTPRequest = new NettyHttpRequest(req, ctx.channel, context, LiftNettyServer)
                 val httpResponse = new NettyHttpResponse(ctx.channel, keepAlive)
 
-                handleLoanWrappers(service(httpRequest, httpResponse) {
+                handleLoanWrappers(LiftNettyServer.liftService(httpRequest, httpResponse) {
                   doNotHandled()
                 })
               }))
