@@ -1,51 +1,39 @@
-package com.something.lift
+package net.liftweb.netty
 
 import net.liftweb.http.provider._
-import net.liftweb.common.{Empty, Box}
-import java.io.InputStream
+import net.liftweb.common._
 import net.liftweb.http.{ParamHolder, LiftResponse, Req}
 import java.util.Locale
-import org.jboss.netty.channel.ChannelHandlerContext
-import org.jboss.netty.handler.codec.http.{HttpRequest, HttpHeaders}
 import java.net.{URI, InetSocketAddress}
-
-
-/**
- * Created by IntelliJ IDEA.
- * User: jordanrw
- * Date: 2/23/12
- * Time: 8:31 PM 
- */
+import java.io.InputStream
+import io.netty.handler.codec.http.{CookieDecoder, QueryStringDecoder, HttpHeaders, FullHttpRequest}
+import io.netty.channel.Channel
+import io.netty.util.CharsetUtil
+import scala.collection.JavaConverters._
 
 /**
  * The representation of a HTTP request state
  */
-class NettyHttpRequest(request: HttpRequest,
-                       channelContext: ChannelHandlerContext,
-                       nettyContext: HTTPNettyContext,
-                       val provider: HTTPProvider) extends HTTPRequest {
+class NettyHttpRequest(request: FullHttpRequest, channel: Channel, nettyContext: NettyHttpContext, val provider: HTTPProvider) extends HTTPRequest {
 
-  lazy val nettyLocalAddress = channelContext.getChannel.getLocalAddress.asInstanceOf[InetSocketAddress]
-  lazy val nettyRemoteAddress = channelContext.getChannel.getRemoteAddress.asInstanceOf[InetSocketAddress]
+  lazy val nettyLocalAddress = channel.localAddress.asInstanceOf[InetSocketAddress]
+  lazy val nettyRemoteAddress = channel.remoteAddress.asInstanceOf[InetSocketAddress]
+  private val queryStringDecoder = new QueryStringDecoder(request.getUri, CharsetUtil.UTF_8)
 
   val contextPath = ""
 
   // FIXME actually return the list of cookies
-  def cookies: List[HTTPCookie] = Nil
+  lazy val cookies: List[HTTPCookie] = LiftNettyCookies.getCookies(request)
 
   // FIXME
   def authType: Box[String] = throw new Exception("Implement me")
 
-  // FIXME
-  def headers(name: String): List[String] = throw new Exception("Implement me")
+  def headers(name: String): List[String] = request.headers().getAll(name).asScala.toList
 
-  // FIXME actually return the list of headers
-  def headers: List[HTTPParam] = Nil //TODO FIXME // throw new Exception("Implement me")
-
+  lazy val headers: List[HTTPParam] = request.headers().names().asScala.map(n => HTTPParam(n, request.headers().get(n))).toList
   def context: HTTPContext = nettyContext
 
-  // FIXME actually return the content type
-  def contentType: Box[String] = Empty //FIXME // throw new Exception("Implement me")
+  def contentType: Box[String] = Box !! request.headers().get(HttpHeaders.Names.CONTENT_TYPE)
 
   def uri: String =  request.getUri
 
@@ -54,23 +42,19 @@ class NettyHttpRequest(request: HttpRequest,
 
   def queryString: Box[String] =  Box !! uri.splitAt(uri.indexOf("?") + 1)._2
 
-  // FIXME
-  def param(name: String): List[String] = throw new Exception("Implement me")
+  def param(name: String): List[String] = queryStringDecoder.parameters().get(name).asScala.toList
 
-  // FIXME
-  def params: List[HTTPParam] = throw new Exception("Implement me")
+  lazy val params: List[HTTPParam] = queryStringDecoder.parameters().asScala.map(b => HTTPParam(b._1, b._2.asScala.toList)).toList
 
-  // FIXME
-  def paramNames: List[String] = throw new Exception("Implement me")
+  lazy val paramNames: List[String] = queryStringDecoder.parameters().asScala.map(_._1).toList
 
   // FIXME the session is fake
-  def session: HTTPSession = new NettyHttpSession
+  def session: HTTPSession =  new NettyHttpSession
 
-  // not needed for netter
+  // not needed for netty
   def destroyServletSession() {}
 
-  // FIXME implement once sessions are supported
-  def sessionId: Box[String] = Empty
+  def sessionId: Box[String] = LiftNettyCookies.getSessionId(request, cookies)
 
   def remoteAddress: String = nettyRemoteAddress.toString
 
@@ -102,7 +86,7 @@ class NettyHttpRequest(request: HttpRequest,
   def inputStream: InputStream = throw new Exception("Implement me")
 
   // FIXME actually detect multipart content
-  def multipartContent_? : Boolean = false
+  def multipartContent_?(): Boolean = false //
 
   // FIXME
   def extractFiles: List[ParamHolder] = throw new Exception("Implement me")
@@ -122,5 +106,5 @@ class NettyHttpRequest(request: HttpRequest,
   // FIXME actually copy instance
   def snapshot: HTTPRequest = this
 
-  def userAgent: Box[String] = Box !! request.getHeader(HttpHeaders.Names.USER_AGENT)
+  def userAgent: Box[String] = Box !! request.headers().get(HttpHeaders.Names.USER_AGENT)
 }

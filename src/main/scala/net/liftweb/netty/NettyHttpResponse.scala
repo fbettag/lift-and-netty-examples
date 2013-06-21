@@ -1,33 +1,23 @@
-package com.something.lift
+package net.liftweb.netty
 
-import org.jboss.netty.buffer.ChannelBuffers
+import io.netty.buffer._
 import net.liftweb.http.provider.{HTTPParam, HTTPCookie, HTTPResponse}
 import java.io.OutputStream
-import org.jboss.netty.channel.{ChannelHandlerContext, ChannelFutureListener}
-import org.jboss.netty.handler.codec.http._
+import io.netty.channel.{Channel, ChannelFutureListener}
+import io.netty.handler.codec.http._
 import net.liftweb.http.LiftRules
-
-/**
- * Created by IntelliJ IDEA.
- * User: jordanrw
- * Date: 2/23/12
- * Time: 8:41 PM
- */
 
 /**
  * Representation of the HTTPResponseStatus
  *
- * @param ctx - the netty channel handler context
+ * @param channel - the netty channel
  * @param keepAlive - if true the channel's connection will remain open after response is written, otherwise it will be closed.
  *
  */
-class NettyHttpResponse(ctx: ChannelHandlerContext, keepAlive: Boolean) extends HTTPResponse {
+class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPResponse {
 
-  lazy val nettyResponse: HttpResponse = {
-    val r = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-    r.setContent(ChannelBuffers.dynamicBuffer(1024)) // TODO this is just some random choice, do something more intelligent?
-    r
-  }
+  val buf = Unpooled.buffer(1024)
+  lazy val nettyResponse: HttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buf)
   
   private var cookies = List[HTTPCookie]()
 
@@ -42,8 +32,8 @@ class NettyHttpResponse(ctx: ChannelHandlerContext, keepAlive: Boolean) extends 
     val appearOnce = Set(LiftRules.overwrittenReponseHeaders.vend.map(_.toLowerCase):_*)
     for (h <- headers;
          value <- h.values) {
-      if (appearOnce.contains(h.name.toLowerCase)) nettyResponse.setHeader(h.name, value)
-      else nettyResponse.addHeader(h.name, value)
+      if (appearOnce.contains(h.name.toLowerCase)) nettyResponse.headers().set(h.name, value)
+      else nettyResponse.headers.set(h.name, value)
     }
   }
 
@@ -51,35 +41,35 @@ class NettyHttpResponse(ctx: ChannelHandlerContext, keepAlive: Boolean) extends 
     nettyResponse.setStatus(HttpResponseStatus.valueOf(status))
   }
 
-  def getStatus: Int = nettyResponse.getStatus.getCode
+  def getStatus: Int = nettyResponse.getStatus.code
 
-  // TODO: it is possible to implement this method although netty has no equiv. but more intelligent content buffer management is needed
-  def setStatusWithReason(status: Int, reason: String) = throw new Exception("not implemented, there is no equivalent in netty")
+  def setStatusWithReason(status: Int, reason: String) {
+    nettyResponse.setStatus(new HttpResponseStatus(status, reason))
+  }
 
   // TODO better flush
   def outputStream: OutputStream = new OutputStream {
 
     def write(i: Int) {
-      nettyResponse.getContent.writeByte(i)
+      buf.writeByte(i)
     }
 
     override def write(bytes: Array[Byte]) {
-      nettyResponse.getContent.writeBytes(bytes)
+      buf.writeBytes(bytes)
     }
     
     override def write(bytes: Array[Byte], offset: Int, len: Int) {
-      nettyResponse.getContent.writeBytes(bytes, offset, len)
+      buf.writeBytes(bytes, offset, len)
     }
 
     override def flush() {
       if (cookies.length > 0) writeCookiesToResponse()
-      val future = ctx.getChannel.write(nettyResponse)
+      val future = channel.write(nettyResponse)
       if (!keepAlive) future.addListener(ChannelFutureListener.CLOSE)
     }
   }
   
   private def writeCookiesToResponse() {
-    val encoder = new CookieEncoder(true)
 
     for (c <- cookies) {
       val cookie = new DefaultCookie(c.name, c.value openOr null)
@@ -89,8 +79,7 @@ class NettyHttpResponse(ctx: ChannelHandlerContext, keepAlive: Boolean) extends 
       c.version foreach (cookie.setVersion(_))
       c.secure_? foreach (cookie.setSecure(_))
       c.httpOnly foreach (cookie.setHttpOnly(_))
+      nettyResponse.headers().add(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode(cookie))
     }
-
-    addHeaders(HTTPParam(HttpHeaders.Names.SET_COOKIE, encoder.encode) :: Nil)
   }
 }

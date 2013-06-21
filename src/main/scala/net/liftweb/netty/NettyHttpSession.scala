@@ -1,15 +1,7 @@
-package com.something.lift
+package net.liftweb.netty
 
 import net.liftweb.http.provider.HTTPSession
 import net.liftweb.http.LiftSession
-
-/**
- * Created by IntelliJ IDEA.
- * User: jordanrw
- * Date: 2/23/12
- * Time: 9:26 PM
- */
-
 
 class NettyHttpSession extends HTTPSession {
 

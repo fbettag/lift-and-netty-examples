@@ -1,18 +1,11 @@
-package com.something.lift
+package net.liftweb.netty
 
 import net.liftweb.http.provider.HTTPContext
+import net.liftweb.common.{ Empty, Box}
 import java.net.URL
 import java.io.InputStream
-import net.liftweb.common.{Empty, Box}
 
-/**
- * Created by IntelliJ IDEA.
- * User: jordanrw
- * Date: 2/23/12
- * Time: 8:07 PM
- */
-
-class HTTPNettyContext extends HTTPContext {
+class NettyHttpContext extends HTTPContext {
 
   // netty has no context, so we assume root
   def path: String = ""
