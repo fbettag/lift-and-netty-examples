@@ -35,7 +35,7 @@ object LiftNettyCookies extends Loggable {
     mac <- Helpers.tryo(javax.crypto.Mac.getInstance(algorithm)) match {
       case Full(algorithm) => Full(algorithm)
       case _ =>
-        logger.error("Invalid Cookie Algorithm '%s'. Hashing disabled.")
+        logger.warn("Invalid Cookie Algorithm '%s'. Hashing disabled.")
         Empty
     }
   } yield {

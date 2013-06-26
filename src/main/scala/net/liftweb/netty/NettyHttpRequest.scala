@@ -14,7 +14,8 @@ import scala.collection.JavaConverters._
 /**
  * The representation of a HTTP request state
  */
-class NettyHttpRequest(request: FullHttpRequest, channel: Channel, nettyContext: NettyHttpContext, val provider: HTTPProvider) extends HTTPRequest {
+class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPRequest {
+  def provider = LiftNettyServer
 
   lazy val nettyLocalAddress = channel.localAddress.asInstanceOf[InetSocketAddress]
   lazy val nettyRemoteAddress = channel.remoteAddress.asInstanceOf[InetSocketAddress]
@@ -31,7 +32,7 @@ class NettyHttpRequest(request: FullHttpRequest, channel: Channel, nettyContext:
   def headers(name: String): List[String] = request.headers().getAll(name).asScala.toList
 
   lazy val headers: List[HTTPParam] = request.headers().names().asScala.map(n => HTTPParam(n, request.headers().get(n))).toList
-  def context: HTTPContext = nettyContext
+  def context: HTTPContext = LiftNettyServer.context
 
   def contentType: Box[String] = Box !! request.headers().get(HttpHeaders.Names.CONTENT_TYPE)
 

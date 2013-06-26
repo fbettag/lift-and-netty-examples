@@ -2,7 +2,7 @@ package net.liftweb.netty
 
 import io.netty.channel._
 import io.netty.handler.codec.http._
-import net.liftweb.common.{Box, Empty}
+import net.liftweb.common.{Loggable, Box, Empty}
 import net.liftweb.http.provider.{HTTPProvider, HTTPRequest}
 import net.liftweb.util.{Helpers, Schedule}
 import net.liftweb.http.{LiftSession, LiftRules, LiftServlet}
@@ -11,10 +11,7 @@ import net.liftweb.http.{LiftSession, LiftRules, LiftServlet}
  * Handles incoming requests which will be sent to an AuthActor
  */
 @ChannelHandler.Sharable
-object NettyRequestHandler extends ChannelInboundHandlerAdapter {
-
-  val context = new NettyHttpContext
-  val liftLand = new LiftServlet(context)
+object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
 
   private def findObject(cls: String): Box[AnyRef] =
     Helpers.tryo[Class[_]](Nil)(Class.forName(cls + "$")).flatMap {
@@ -41,7 +38,6 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter {
 
   override def channelActive(ctx: ChannelHandlerContext) {
     println("client connected")
-    LiftRules.setContext(context)
   }
 
   override def channelUnregistered(ctx: ChannelHandlerContext) {
@@ -64,13 +60,15 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter {
           ctx.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE))
         }
 
-        def doNotHandled() {}
+        def doNotHandled() {
+          logger.warn("do not handled called")
+        }
 
         Schedule(() => {
           try {
             transientVarProvider(Empty,
               reqVarProvider(Empty, {
-                val httpRequest: HTTPRequest = new NettyHttpRequest(req, ctx.channel, context, LiftNettyServer)
+                val httpRequest: HTTPRequest = new NettyHttpRequest(req, ctx.channel)
                 val httpResponse = new NettyHttpResponse(ctx.channel, keepAlive)
 
                 handleLoanWrappers(LiftNettyServer.liftService(httpRequest, httpResponse) {

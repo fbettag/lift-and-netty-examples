@@ -6,10 +6,13 @@ import io.netty.channel.{ChannelInitializer, ChannelOption}
 import io.netty.channel.socket.nio.NioServerSocketChannel
 import io.netty.channel.socket.SocketChannel
 import java.net.InetSocketAddress
-import net.liftweb.common.Empty
+import net.liftweb.common.{Loggable, Empty}
 import net.liftweb.http.provider.{HTTPProvider, HTTPRequest, HTTPResponse}
+import net.liftweb.util.{NamedPF, Helpers}
+import net.liftweb.http._
+import scala.Some
 
-object LiftNettyServer extends App with HTTPProvider { APP =>
+object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
   private var loopGroup1: Option[NioEventLoopGroup] = None
   private var loopGroup2: Option[NioEventLoopGroup] = None
 
@@ -48,7 +51,33 @@ object LiftNettyServer extends App with HTTPProvider { APP =>
   }
 
   val context = new NettyHttpContext
-  def liftService(req : HTTPRequest, resp : HTTPResponse)(chain : => Unit) = super.service(req, resp)(chain)
+  def liftService(req : HTTPRequest, resp : HTTPResponse)(chain : => Unit) = {
+      logger.warn("beginning!")
+      Helpers.tryo {
+        LiftRules.early.toList.foreach(_(req))
+      }
+
+      CurrentHTTPReqResp.doWith(req -> resp) {
+        val newReq = Req(req, LiftRules.statelessRewrite.toList,
+          Nil,
+          LiftRules.statelessReqTest.toList,
+          System.nanoTime)
+
+        CurrentReq.doWith(newReq) {
+          URLRewriter.doWith(url =>
+            NamedPF.applyBox(resp.encodeUrl(url),
+              LiftRules.urlDecorate.toList) openOr
+              resp.encodeUrl(url)) {
+            logger.warn("through here! isLiftRequest_: " + isLiftRequest_?(newReq))
+            if (isLiftRequest_?(newReq)) super.service(req, resp)(chain)
+            else {
+              logger.warn("this should be handled by netty as static file as it is not handled by lift/jar")
+              chain
+            }
+          }
+        }
+      }
+    }
 
   def stop() {
     loopGroup1.map(_.shutdownGracefully())
