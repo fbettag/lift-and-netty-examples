@@ -20,7 +20,7 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "net.liftweb" %% "lift-webkit" % "2.5-M4" % "compile",
-  "org.eclipse.jetty" % "jetty-webapp" % "7.6.9.v20130131",
+  "org.eclipse.jetty" % "jetty-webapp" % "7.6.11.v20130520",
   "ch.qos.logback" % "logback-classic" % "1.0.0" % "compile",
   "io.netty" % "netty-all" % "4.0.0.CR6"
 )
