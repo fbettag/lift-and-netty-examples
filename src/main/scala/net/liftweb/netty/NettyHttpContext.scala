@@ -5,19 +5,16 @@ import net.liftweb.common.{Loggable, Empty, Box}
 import java.net.URL
 import java.io.{ InputStream, File }
 import io.netty.handler.codec.http.FullHttpRequest
+import scala.collection.concurrent.TrieMap
 
-class NettyHttpContext extends HTTPContext with Loggable {
+object NettyHttpContext extends HTTPContext with Loggable {
 
   // netty has no context, so we assume root
-  def path: String = new File(".").getPath()
+  def path: String = ""
 
-  // FIXME this should actually return the path to the resource @see{net.liftweb.http.provider.HTTPContext}
-  //def resource(path: String): URL = new File(".").toURI().toURL()
-  def resource(path: String): URL =
-    new File(classOf[NettyHttpContext].getProtectionDomain().getCodeSource().getLocation().getPath()).toURI().toURL()
+  def resource(path: String): URL = getClass.getResource(s"webapp/${path}")
 
-  // FIXME @see{net.liftweb.http.provider.HTTPContext}
-  def resourceAsStream(path: String): InputStream = throw new Exception("Not Yet Implemented")
+  def resourceAsStream(path: String): InputStream = resource(path).openStream()
 
   // FIXME  @see{net.liftweb.http.provider.HTTPContext}
   def mimeType(path: String): Box[String] = Some("text/html")
@@ -28,11 +25,13 @@ class NettyHttpContext extends HTTPContext with Loggable {
 
   def initParams: List[(String, String)] = List()
 
-  def attribute(name: String): Box[Any] = Empty
+  val _attributes = TrieMap.empty[String, Any]
 
-  def attributes: List[(String, Any)] = List()
+  def attribute(name: String): Box[Any] = _attributes.get(name)
 
-  def setAttribute(name: String, value: Any) { }
+  def attributes: List[(String, Any)] = _attributes.toList
 
-  def removeAttribute(name: String) { }
+  def setAttribute(name: String, value: Any) = _attributes.put(name, value)
+
+  def removeAttribute(name: String) = _attributes.remove(name)
 }

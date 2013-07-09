@@ -13,7 +13,11 @@ import net.liftweb.http._
 import scala.Some
 
 object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
+
+  override def context = NettyHttpContext
+
   private var loopGroup1: Option[NioEventLoopGroup] = None
+
   private var loopGroup2: Option[NioEventLoopGroup] = None
 
   override def main(args: Array[String]) {
@@ -50,7 +54,6 @@ object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
     srv
   }
 
-  val context = new NettyHttpContext
   def liftService(req : HTTPRequest, resp : HTTPResponse)(chain : => Unit) = {
       logger.warn("beginning!")
       Helpers.tryo {

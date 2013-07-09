@@ -22,8 +22,10 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
         }
     }
 
-  type VarProvider = { def apply[T](session: Box[LiftSession], f: => T): T}
+  type VarProvider = {def apply[T](session: Box[LiftSession], f: => T): T}
+
   lazy val transientVarProvider = findObject("net.liftweb.http.TransientRequestVarHandler").openOrThrowException("because").asInstanceOf[VarProvider]
+
   lazy val reqVarProvider = findObject("net.liftweb.http.RequestVarHandler").openOrThrowException("because").asInstanceOf[VarProvider]
 
   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) {
@@ -34,7 +36,6 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
         if (ctx.channel().isOpen) ctx.channel().close
     }
   }
-
 
   override def channelActive(ctx: ChannelHandlerContext) {
     println("client connected")
@@ -53,7 +54,7 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
   def messageReceived(ctx: ChannelHandlerContext, msg: Object) {
     msg match {
       case req: FullHttpRequest =>
-         println(req.toString)
+        println(req.toString)
         val keepAlive = HttpHeaders.isKeepAlive(req)
 
         if (HttpHeaders.is100ContinueExpected(req)) {
