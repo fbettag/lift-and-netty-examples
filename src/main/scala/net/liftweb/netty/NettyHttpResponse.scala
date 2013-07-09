@@ -2,8 +2,8 @@ package net.liftweb.netty
 
 import io.netty.buffer._
 import net.liftweb.http.provider.{HTTPParam, HTTPCookie, HTTPResponse}
-import java.io.OutputStream
-import io.netty.channel.{Channel, ChannelFutureListener}
+import java.io.{IOException, OutputStream}
+import io.netty.channel.{ChannelFuture, Channel, ChannelFutureListener}
 import io.netty.handler.codec.http._
 import net.liftweb.http.LiftRules
 
@@ -49,16 +49,20 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
   // TODO better flush
   def outputStream: OutputStream = new OutputStream {
 
-    var buf = Unpooled.buffer(1024)
+    var last: Option[ChannelFuture] = None
 
     lazy val firstWrite = {
       if (cookies.length > 0) writeCookiesToResponse()
-      channel.write(nettyResponse)
+      last = Option(channel.write(nettyResponse))
       println("Wrote headers to channel")
     }
 
     def writeBuffer(buffer: ByteBuf) = {
-      channel.write(buffer)
+      buffer.retain()
+      if(buffer.isReadable) {
+        println(s"Writing buffer of size ${buffer.readableBytes()}")
+        last = Option(channel.write(buffer))
+      }
     }
 
     def write(i: Int) {
@@ -79,8 +83,12 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
     }
 
     override def flush() {
-      channel.write(buf)
-      buf = Unpooled.buffer(1024)
+      last foreach { future =>
+        println("Flushing channel")
+        future.awaitUninterruptibly()
+        if(!future.isSuccess)
+          throw new IOException("Error writing to channel", future.cause())
+      }
     }
 
     override def close() {
@@ -89,6 +97,7 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
         flush()
       } finally {
         channel.close().awaitUninterruptibly()
+        println("Closed channel")
       }
     }
 
