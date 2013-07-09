@@ -23,11 +23,7 @@ class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPR
 
   val contextPath = ""
 
-  // FIXME actually return the list of cookies
   lazy val cookies: List[HTTPCookie] = LiftNettyCookies.getCookies(request)
-
-  // FIXME
-  def authType: Box[String] = throw new Exception("Implement me")
 
   def headers(name: String): List[String] = request.headers().getAll(name).asScala.toList
 
@@ -38,8 +34,7 @@ class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPR
 
   def uri: String =  request.getUri
 
-  // FIXME
-  def url: String = throw new Exception("Implement me")
+  def url: String = request.getUri
 
   def queryString: Box[String] =  Box !! uri.splitAt(uri.indexOf("?") + 1)._2
 
@@ -48,9 +43,6 @@ class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPR
   lazy val params: List[HTTPParam] = queryStringDecoder.parameters().asScala.map(b => HTTPParam(b._1, b._2.asScala.toList)).toList
 
   lazy val paramNames: List[String] = queryStringDecoder.parameters().asScala.map(_._1).toList
-
-  // FIXME the session is fake
-  def session: HTTPSession =  new NettyHttpSession
 
   // not needed for netty
   def destroyServletSession() {}
@@ -65,11 +57,23 @@ class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPR
 
   def serverName: String = nettyLocalAddress.getHostName
 
-  def scheme: String = (new URI(request.getUri)).getScheme
+  def scheme: String = new URI(request.getUri).getScheme
 
   def serverPort: Int = nettyLocalAddress.getPort
 
   def method: String = request.getMethod.toString
+
+  lazy val inputStream: InputStream = {
+    val arr = Array[Byte]()
+    request.content().getBytes(0, arr)
+    new ByteArrayInputStream(arr)
+  }
+
+  // FIXME the session is fake
+  def session: HTTPSession =  new NettyHttpSession
+
+  // FIXME
+  def authType: Box[String] = throw new Exception("Implement me")
 
   // FIXME not really implemented, @dpp made it false when we started, left comment, "this should be trivial"
   def suspendResumeSupport_? : Boolean = false
@@ -82,12 +86,6 @@ class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPR
 
   // FIXME trivial support
   def resume(what: (Req, LiftResponse)): Boolean = throw new Exception("Implement me")
-
-  def inputStream: InputStream = {
-    val arr = Array[Byte]()
-    request.content().getBytes(0, arr)
-    new ByteArrayInputStream(arr)
-  }
 
   // FIXME actually detect multipart content
   def multipartContent_?(): Boolean = false //
@@ -108,7 +106,7 @@ class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPR
    * The new instance must not keep any reference to the container' instances.
    */
   // FIXME actually copy instance
-  def snapshot: HTTPRequest = this
+  def snapshot: HTTPRequest = this.clone().asInstanceOf[NettyHttpRequest]
 
   def userAgent: Box[String] = Box !! request.headers().get(HttpHeaders.Names.USER_AGENT)
 }

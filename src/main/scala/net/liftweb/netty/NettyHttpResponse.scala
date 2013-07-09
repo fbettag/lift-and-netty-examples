@@ -16,7 +16,20 @@ import net.liftweb.http.LiftRules
  */
 class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPResponse {
 
-  lazy val nettyResponse: HttpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+  lazy val nettyResponse = {
+    val resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+    for (c <- cookies) {
+      val cookie = new DefaultCookie(c.name, c.value openOr null)
+      c.domain foreach (cookie.setDomain(_))
+      c.path foreach (cookie.setPath(_))
+      c.maxAge foreach (cookie.setMaxAge(_))
+      c.version foreach (cookie.setVersion(_))
+      c.secure_? foreach (cookie.setSecure(_))
+      c.httpOnly foreach (cookie.setHttpOnly(_))
+      resp.headers().add(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode(cookie))
+    }
+    resp
+  }
   
   private var cookies = List[HTTPCookie]()
 
@@ -51,34 +64,32 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
 
     var last: Option[ChannelFuture] = None
 
-    lazy val firstWrite = {
-      if (cookies.length > 0) writeCookiesToResponse()
+    private var headerWritten = false
+    private def writeHeaders: Unit = if (!headerWritten) {
       last = Option(channel.write(nettyResponse))
-      println("Wrote headers to channel")
+      headerWritten = true
     }
 
     def writeBuffer(buffer: ByteBuf) = {
-      buffer.retain()
+      writeHeaders
+      val resp = new DefaultLastHttpContent(buffer.retain)
       if(buffer.isReadable) {
         println(s"Writing buffer of size ${buffer.readableBytes()}")
-        last = Option(channel.write(buffer))
+        last = Option(channel.write(resp))
       }
     }
 
     def write(i: Int) {
-      firstWrite
       val buf = Unpooled.buffer(1)
       buf.writeByte(i)
       writeBuffer(buf)
     }
 
     override def write(bytes: Array[Byte]) {
-      firstWrite
       writeBuffer(Unpooled.copiedBuffer(bytes))
     }
     
     override def write(bytes: Array[Byte], offset: Int, len: Int) {
-      firstWrite
       writeBuffer(Unpooled.copiedBuffer(bytes, offset, len))
     }
 
@@ -93,7 +104,6 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
 
     override def close() {
       try {
-        firstWrite
         flush()
       } finally {
         channel.close().awaitUninterruptibly()
@@ -101,19 +111,5 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
       }
     }
 
-  }
-  
-  private def writeCookiesToResponse() {
-
-    for (c <- cookies) {
-      val cookie = new DefaultCookie(c.name, c.value openOr null)
-      c.domain foreach (cookie.setDomain(_))
-      c.path foreach (cookie.setPath(_))
-      c.maxAge foreach (cookie.setMaxAge(_))
-      c.version foreach (cookie.setVersion(_))
-      c.secure_? foreach (cookie.setSecure(_))
-      c.httpOnly foreach (cookie.setHttpOnly(_))
-      nettyResponse.headers().add(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode(cookie))
-    }
   }
 }
