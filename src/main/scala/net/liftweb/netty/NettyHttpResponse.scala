@@ -16,8 +16,7 @@ import net.liftweb.http.LiftRules
  */
 class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPResponse {
 
-  val buf = Unpooled.buffer(1024)
-  lazy val nettyResponse: HttpResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buf)
+  lazy val nettyResponse: HttpResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
   
   private var cookies = List[HTTPCookie]()
 
@@ -50,23 +49,49 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
   // TODO better flush
   def outputStream: OutputStream = new OutputStream {
 
+    var buf = Unpooled.buffer(1024)
+
+    lazy val firstWrite = {
+      if (cookies.length > 0) writeCookiesToResponse()
+      channel.write(nettyResponse)
+      println("Wrote headers to channel")
+    }
+
+    def writeBuffer(buffer: ByteBuf) = {
+      channel.write(buffer)
+    }
+
     def write(i: Int) {
+      firstWrite
+      val buf = Unpooled.buffer(1)
       buf.writeByte(i)
+      writeBuffer(buf)
     }
 
     override def write(bytes: Array[Byte]) {
-      buf.writeBytes(bytes)
+      firstWrite
+      writeBuffer(Unpooled.copiedBuffer(bytes))
     }
     
     override def write(bytes: Array[Byte], offset: Int, len: Int) {
-      buf.writeBytes(bytes, offset, len)
+      firstWrite
+      writeBuffer(Unpooled.copiedBuffer(bytes, offset, len))
     }
 
     override def flush() {
-      if (cookies.length > 0) writeCookiesToResponse()
-      val future = channel.write(nettyResponse)
-      if (!keepAlive) future.addListener(ChannelFutureListener.CLOSE)
+      channel.write(buf)
+      buf = Unpooled.buffer(1024)
     }
+
+    override def close() {
+      try {
+        firstWrite
+        flush()
+      } finally {
+        channel.close().awaitUninterruptibly()
+      }
+    }
+
   }
   
   private def writeCookiesToResponse() {
