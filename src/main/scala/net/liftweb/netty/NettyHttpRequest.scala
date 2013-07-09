@@ -5,7 +5,7 @@ import net.liftweb.common._
 import net.liftweb.http.{ParamHolder, LiftResponse, Req}
 import java.util.Locale
 import java.net.{URI, InetSocketAddress}
-import java.io.InputStream
+import java.io.{ByteArrayInputStream, InputStream}
 import io.netty.handler.codec.http.{CookieDecoder, QueryStringDecoder, HttpHeaders, FullHttpRequest}
 import io.netty.channel.Channel
 import io.netty.util.CharsetUtil
@@ -83,8 +83,11 @@ class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPR
   // FIXME trivial support
   def resume(what: (Req, LiftResponse)): Boolean = throw new Exception("Implement me")
 
-  // FIXME
-  def inputStream: InputStream = throw new Exception("Implement me")
+  def inputStream: InputStream = {
+    val arr = Array[Byte]()
+    request.content().getBytes(0, arr)
+    new ByteArrayInputStream(arr)
+  }
 
   // FIXME actually detect multipart content
   def multipartContent_?(): Boolean = false //

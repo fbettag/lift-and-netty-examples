@@ -66,8 +66,11 @@ object LiftNettyCookies extends Loggable {
   }
 
   def getCookies(req: HttpRequest): List[HTTPCookie] = {
-    val value = req.headers().get("Cookie")
-    CookieDecoder.decode(value).asScala.toList.map(convertCookie)
+    Option(req.headers().get("Cookie")) match {
+      case Some(value: String) =>
+        CookieDecoder.decode(value).asScala.toList.map(convertCookie)
+      case _ => List()
+    }
   }
 
   def convertCookie(cookie: Cookie) = HTTPCookie(
