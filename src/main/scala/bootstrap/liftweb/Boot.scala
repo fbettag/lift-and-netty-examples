@@ -7,7 +7,7 @@ import net.liftweb.util._
 import net.liftweb.sitemap._
 
 class Boot extends Loggable {
-  def boot {
+  def boot() {
     logger.info("Run Mode: " + Props.mode.toString)
 
     // where to search snippet

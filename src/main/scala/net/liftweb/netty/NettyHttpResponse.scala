@@ -16,21 +16,9 @@ import net.liftweb.http.LiftRules
  */
 class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPResponse {
 
-  lazy val nettyResponse = {
-    val resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-    for (c <- cookies) {
-      val cookie = new DefaultCookie(c.name, c.value openOr null)
-      c.domain foreach (cookie.setDomain(_))
-      c.path foreach (cookie.setPath(_))
-      c.maxAge foreach (cookie.setMaxAge(_))
-      c.version foreach (cookie.setVersion(_))
-      c.secure_? foreach (cookie.setSecure(_))
-      c.httpOnly foreach (cookie.setHttpOnly(_))
-      resp.headers().add(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode(cookie))
-    }
-    resp
-  }
-  
+  val nettyHeaders = new DefaultHttpHeaders()
+  private var responseStatus: HttpResponseStatus = HttpResponseStatus.OK
+
   private var cookies = List[HTTPCookie]()
 
   def addCookies(cks: List[HTTPCookie]) {
@@ -44,38 +32,52 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
     val appearOnce = Set(LiftRules.overwrittenReponseHeaders.vend.map(_.toLowerCase):_*)
     for (h <- headers;
          value <- h.values) {
-      if (appearOnce.contains(h.name.toLowerCase)) nettyResponse.headers().set(h.name, value)
-      else nettyResponse.headers.set(h.name, value)
+      if (appearOnce.contains(h.name.toLowerCase)) nettyHeaders.set(h.name, value)
+      else nettyHeaders.set(h.name, value)
     }
   }
 
-  def setStatus(status: Int) {
-    nettyResponse.setStatus(HttpResponseStatus.valueOf(status))
-  }
+  def setStatus(status: Int): Unit = responseStatus = HttpResponseStatus.valueOf(status)
 
-  def getStatus: Int = nettyResponse.getStatus.code
+  def getStatus: Int = responseStatus.code()
 
-  def setStatusWithReason(status: Int, reason: String) {
-    nettyResponse.setStatus(new HttpResponseStatus(status, reason))
-  }
+  def setStatusWithReason(status: Int, reason: String): Unit = responseStatus = new HttpResponseStatus(status, reason)
+
 
   // TODO better flush
   def outputStream: OutputStream = new OutputStream {
 
     var last: Option[ChannelFuture] = None
+    def writeBuffer(buffer: ByteBuf) = if (buffer.isReadable) {
+      println(s"Writing buffer of size ${buffer.readableBytes()}")
 
-    private var headerWritten = false
-    private def writeHeaders: Unit = if (!headerWritten) {
-      last = Option(channel.write(nettyResponse))
-      headerWritten = true
-    }
+      last match {
+        case None =>
+          val nettyResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+          for (c <- cookies) {
+            val cookie = new DefaultCookie(c.name, c.value openOr null)
 
-    def writeBuffer(buffer: ByteBuf) = {
-      writeHeaders
-      val resp = new DefaultLastHttpContent(buffer.retain)
-      if(buffer.isReadable) {
-        println(s"Writing buffer of size ${buffer.readableBytes()}")
-        last = Option(channel.write(resp))
+            c.domain foreach (cookie.setDomain(_))
+            c.path foreach (cookie.setPath(_))
+            c.maxAge foreach (cookie.setMaxAge(_))
+            c.version foreach (cookie.setVersion(_))
+            c.secure_? foreach (cookie.setSecure(_))
+            c.httpOnly foreach (cookie.setHttpOnly(_))
+            nettyHeaders.add(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode(cookie))
+          }
+          nettyResponse.setStatus(responseStatus)
+          nettyResponse.headers().add(nettyHeaders)
+          channel.write(nettyResponse)
+
+          val f = channel.write(new DefaultHttpContent(buffer.retain))
+          //if (!keepAlive) f.addListener(ChannelFutureListener.CLOSE)
+          last = Some(f)
+
+        case Some(_) =>
+          val nettyResponse = new DefaultLastHttpContent(buffer.retain)
+          val f = channel.write(nettyResponse)
+          if (!keepAlive) f.addListener(ChannelFutureListener.CLOSE)
+          last = Some(f)
       }
     }
 
@@ -86,11 +88,11 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
     }
 
     override def write(bytes: Array[Byte]) {
-      writeBuffer(Unpooled.copiedBuffer(bytes))
+      if (bytes.length > 0) writeBuffer(Unpooled.copiedBuffer(bytes).retain)
     }
     
     override def write(bytes: Array[Byte], offset: Int, len: Int) {
-      writeBuffer(Unpooled.copiedBuffer(bytes, offset, len))
+      if (bytes.length >= offset+len) writeBuffer(Unpooled.copiedBuffer(bytes, offset, len).retain)
     }
 
     override def flush() {

@@ -55,7 +55,6 @@ object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
   }
 
   def liftService(req : HTTPRequest, resp : HTTPResponse)(chain : => Unit) = {
-      logger.warn("beginning!")
       Helpers.tryo {
         LiftRules.early.toList.foreach(_(req))
       }
@@ -71,7 +70,6 @@ object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
             NamedPF.applyBox(resp.encodeUrl(url),
               LiftRules.urlDecorate.toList) openOr
               resp.encodeUrl(url)) {
-            logger.warn("through here! isLiftRequest_: " + isLiftRequest_?(newReq))
             if (isLiftRequest_?(newReq)) super.service(req, resp)(chain)
             else {
               logger.warn("this should be handled by netty as static file as it is not handled by lift/jar")

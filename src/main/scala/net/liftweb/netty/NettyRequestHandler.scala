@@ -54,7 +54,6 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
   def messageReceived(ctx: ChannelHandlerContext, msg: Object) {
     msg match {
       case req: FullHttpRequest =>
-        println(req.toString)
         val keepAlive = HttpHeaders.isKeepAlive(req)
 
         if (HttpHeaders.is100ContinueExpected(req)) {

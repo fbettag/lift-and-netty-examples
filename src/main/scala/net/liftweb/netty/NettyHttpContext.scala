@@ -12,7 +12,7 @@ object NettyHttpContext extends HTTPContext with Loggable {
   // netty has no context, so we assume root
   def path: String = ""
 
-  def resource(path: String): URL = getClass.getResource(s"webapp/${path}")
+  def resource(path: String): URL = getClass.getResource("lift-webapp/" + path)
 
   def resourceAsStream(path: String): InputStream = resource(path).openStream()
 
