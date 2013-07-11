@@ -14,7 +14,12 @@ import scala.Some
 
 object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
 
-  override def context = NettyHttpContext
+  override lazy val context = {
+    //Set the context here and in LiftRules simultaneously
+    val ctx = NettyHttpContext
+    LiftRules.setContext(ctx)
+    ctx
+  }
 
   private var loopGroup1: Option[NioEventLoopGroup] = None
 
