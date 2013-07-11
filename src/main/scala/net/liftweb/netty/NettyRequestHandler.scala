@@ -38,11 +38,11 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
   }
 
   override def channelActive(ctx: ChannelHandlerContext) {
-    println("client connected")
+    logger.debug("client connected")
   }
 
   override def channelUnregistered(ctx: ChannelHandlerContext) {
-    println("client disconnected")
+    logger.debug("client disconnected")
   }
 
   override def messageReceived(ctx: ChannelHandlerContext, msgs: MessageList[Object]) {

@@ -1,80 +1,85 @@
 package net.liftweb.netty
 
-import scala.collection.JavaConversions._
-
 import io.netty.buffer._
 import io.netty.channel._
 import io.netty.handler.codec.http._
-import io.netty.handler.codec.ByteToMessageDecoder
-import io.netty.handler.ssl.SslHandler
 import io.netty.handler.codec.compression.ZlibCodecFactory
 import io.netty.handler.codec.compression.ZlibWrapper
+import io.netty.handler.codec.ByteToMessageDecoder
+import net.liftweb.common.Logger
+import net.liftweb.util.Props
 
 /**
  * Manipulates the current pipeline dynamically to switch protocols or enable SSL or GZIP.
  */
-@ChannelHandler.Sharable
-object ProtoNegoHandler extends ByteToMessageDecoder {
+object ProtoNegoHandler extends Logger {
+  val maxChunkSize = Props.getInt("http.maxChunkSizeInBytes", 8192)
+  val maxHeaderSize = Props.getInt("http.maxHeaderSizeInBytes", 8192)
+  val maxInitLength = Props.getInt("http.maxInitialLineLength", 1024)
+  val maxContentLength = Props.getInt("http.maxContentLengthInKB", 1024) * 1024
+}
+
+class ProtoNegoHandler(
+  detectSsl: Boolean = false, // SslManager.sslAvailable,
+  detectGzip: Boolean = Props.getBool("http.gzip", false)) extends ByteToMessageDecoder {
 
   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) {
     cause match {
       case e: javax.net.ssl.SSLException => //ignore this
       case e: Throwable =>
-        NettyExceptionHandler(ctx, e) foreach { c =>
-          c.printStackTrace()
-        }
+      /*ExceptionHandler(ctx, cause) foreach { c =>
+          if (!debugStackTraces) ProtoNegoHandler.debug(cause.toString, cause)
+          else ProtoNegoHandler.debug(stackTraceToString(cause))
+        }*/
     }
   }
 
-  val maxChunkSize = 8192
-  val maxHeaderSize = 8192
-  val maxInitLength = 1024
-  val maxContentLength = 1024 * 1024
-  val detectSsl = false //SslManager.sslAvailable
-  val detectGzip = true //Config.getBool("http.gzip", false)
-
-  def decode(ctx: ChannelHandlerContext, buffer: ByteBuf, out: MessageList[Object]) {
+  override def decode(ctx: ChannelHandlerContext, buffer: ByteBuf, msgsOut: MessageList[Object]) {
     // Will use the first two bytes to detect a protocol.
     if (buffer.readableBytes() < 5) return
 
     val magic1 = buffer.getUnsignedByte(buffer.readerIndex())
     val magic2 = buffer.getUnsignedByte(buffer.readerIndex() + 1)
     val p = ctx.pipeline
-    p.names.find(_.startsWith("nego")) match {
-      case Some("nego") => // new connection
-        if (detectSsl && SslHandler.isEncrypted(buffer)) {
-          //val engine = LiftNettyServer.service.sslManager.createSSLEngine
-          //engine.setEnableSessionCreation(true)
-          //p.addLast("ssl", new SslHandler(engine))
-        }
 
-        p.addLast("nego_gzip", this)
-        buffer.retain
-        p.remove(this)
+    if (detectSsl) {
 
-      case Some("nego_gzip") => // past SSL
-        if (detectGzip && isGzip(magic1, magic2)) {
-          p.addLast("gzipdeflater", ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP))
-          p.addLast("gzipinflater", ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP))
-        }
-        p.addLast("nego_http", this)
-        buffer.retain
-        p.remove(this)
+      // Check for encrypted bytes
+      /*if (SslHandler.isEncrypted(buffer)) {
+        val engine = Server.service.sslManager.createSSLEngine
+        engine.setEnableSessionCreation(true)
+        p.addLast("ssl", new SslHandler(engine))
+      }*/
 
-      case Some("nego_http") if isHttp(magic1, magic2) => // past GZIP
-        p.addLast("decoder", new HttpRequestDecoder(maxInitLength, maxHeaderSize, maxChunkSize))
-        p.addLast("aggregator", new HttpObjectAggregator(maxContentLength))
-        p.addLast("encoder", new HttpResponseEncoder())
-        if (detectGzip) p.addLast("deflater", new HttpContentCompressor())
-        p.addLast("requestHandler", NettyRequestHandler)
-        buffer.retain
-        p.remove(this)
+      p.addLast("nego_gzip", new ProtoNegoHandler(false, detectGzip))
+      buffer.retain
+      p.remove(this)
+    } else if (detectGzip) {
+      // disable auto-read on the channel until authentication has finished
+      //ctx.channel().config().setAutoRead(false)
 
-      case _ =>
-        println("unknown protocol")
-        // Unknown protocol; discard everything and close the connection.
-        buffer.clear
-        ctx.close
+      // Check for gzip compression
+      if (isGzip(magic1, magic2)) {
+        p.addLast("gzipdeflater", ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP))
+        p.addLast("gzipinflater", ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP))
+      }
+      p.addLast("nego_http", new ProtoNegoHandler(detectSsl, false))
+      buffer.retain
+      p.remove(this)
+    } else if (isHttp(magic1, magic2)) {
+      import ProtoNegoHandler._
+      p.addLast("decoder", new HttpRequestDecoder(maxInitLength, maxHeaderSize, maxChunkSize))
+      p.addLast("aggregator", new HttpObjectAggregator(maxContentLength))
+      p.addLast("encoder", new HttpResponseEncoder())
+      if (detectGzip) p.addLast("deflater", new HttpContentCompressor())
+      p.addLast("requestHandler", NettyRequestHandler)
+      buffer.retain
+      p.remove(this)
+    } else {
+      ProtoNegoHandler.info("unknown protocol: " + ctx.channel.remoteAddress.asInstanceOf[java.net.InetSocketAddress].getAddress.getHostAddress)
+      // Unknown protocol; discard everything and close the connection.
+      buffer.clear
+      ctx.close
     }
   }
 
@@ -95,3 +100,4 @@ object ProtoNegoHandler extends ByteToMessageDecoder {
   }
 
 }
+

@@ -38,7 +38,7 @@ object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
       .childOption[java.lang.Integer](ChannelOption.SO_LINGER, 0)
       .childHandler(new ChannelInitializer[SocketChannel] {
         override def initChannel(ch: SocketChannel) {
-          ch.pipeline.addLast("nego", ProtoNegoHandler)
+          ch.pipeline.addLast("nego", new ProtoNegoHandler)
         }
       })
     bootLift(Empty)
