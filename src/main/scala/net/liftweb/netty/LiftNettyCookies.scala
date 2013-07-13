@@ -3,11 +3,18 @@ package net.liftweb.netty
 import net.liftweb.util._
 import net.liftweb.common._
 import net.liftweb.http.provider.HTTPCookie
+
 import io.netty.handler.codec.http._
-import scala.collection.JavaConverters._
+
+import collection.mutable.{ Set => MSet }
+import collection.convert.WrapAsScala._
 
 
 object LiftNettyCookies extends Loggable {
+
+  val sessionCookieName = Props.get("lift.cookie.name", "JSESSIONID")
+
+  private val _random = new java.security.SecureRandom
 
   private val algo = Props.get("lift.hash.algo")
 
@@ -16,8 +23,8 @@ object LiftNettyCookies extends Loggable {
     case _ => logger.warn("Cookie Hashing is not enabled!")
   }
 
-  private val key = Props.get("lift.hash.key") match {
-    case Full(key) if key.trim.length > 0 => Full(key)
+  private val key = Props.get("lift.cookie.secret").map(_.trim) match {
+    case Full(key) if key.length > 0 => Full(key)
     case _ =>
       logger.error("Cookie Hashing Key empty or too short. Hashing disabled.")
       Empty
@@ -26,14 +33,14 @@ object LiftNettyCookies extends Loggable {
   private val secret = for {
     algorithm <- algo
     secretKey <- key
-    secret <- Helpers.tryo(new javax.crypto.spec.SecretKeySpec(secretKey.toCharArray.map(_.toByte), algorithm))
+    secret <- Helpers.tryo(new javax.crypto.spec.SecretKeySpec(secretKey.getBytes, algorithm))
   } yield secret
 
   private val mac = for {
     algorithm <- algo
     secretKey <- secret
     mac <- Helpers.tryo(javax.crypto.Mac.getInstance(algorithm)) match {
-      case Full(algorithm) => Full(algorithm)
+      case f @ Full(algorithm) => f
       case _ =>
         logger.warn("Invalid Cookie Algorithm '%s'. Hashing disabled.")
         Empty
@@ -45,31 +52,26 @@ object LiftNettyCookies extends Loggable {
 
   private def hashSessionId(id: String) = for {
     mac <- mac
-    key <- key
-  } yield mac.doFinal(id.toCharArray.map(_.toByte)).map(b => Integer.toString((b & 0xff) + 0x100, 16).substring(1)).mkString
-
+  } yield Helpers.base64Encode(mac.doFinal(id.getBytes))
+  
   def addSessionId(resp: HttpResponse, id: String) {
-    resp.headers.add("Set-Cookie", algo match {
-      case Full(algo) =>
-        hashSessionId(id) match {
-          case Full(hsid) =>
-            ServerCookieEncoder.encode(
-              new DefaultCookie("JSESSIONID", id),
-              new DefaultCookie("HSESSIONID", hsid)
-            )
-          case _ =>
-            logger.error("Hashing for session-id %s failed. Not sending cookie to client.".format(id))
-            ServerCookieEncoder.encode("JSESSIONID", id)
-        }
-      case _ => ServerCookieEncoder.encode("JSESSIONID", id)
-    })
+    resp.headers.add("Set-Cookie", 
+      hashSessionId(id) match {
+        case Full(hsid) =>
+          ServerCookieEncoder.encode(
+            new DefaultCookie(sessionCookieName, id + "." + hsid)
+          )
+        case _ =>
+          ServerCookieEncoder.encode(sessionCookieName, id)
+      }
+    )
   }
 
   def getCookies(req: HttpRequest): List[HTTPCookie] = {
     Option(req.headers().get("Cookie")) match {
-      case Some(value: String) =>
-        CookieDecoder.decode(value).asScala.toList.map(convertCookie)
-      case _ => List()
+      case Some(value) =>
+        CookieDecoder.decode(value).map(convertCookie).toList
+      case _ => Nil
     }
   }
 
@@ -83,29 +85,30 @@ object LiftNettyCookies extends Loggable {
     Option(cookie.isSecure)
   )
 
-  def getSessionId(req: HttpRequest, cookies: List[HTTPCookie]): Box[String] = {
-    val sessionCookies = cookies.filter(c => c.name.equals("JSESSIONID") || c.name.equals("HSESSIONID"))
+  def generateNewSessionId = _random.synchronized { 
+    val array = new Array[Byte](24)
+    _random.nextBytes(array)
+    Helpers.base64Encode(array)
+  }
 
-    sessionCookies.find(_.name == "JSESSIONID") match {
-      case Some(jsessionCookie) if jsessionCookie.value != Empty =>
-        sessionCookies.find(_.name == "HSESSIONID") match {
-          case Some(hsessionCookie) =>
-            for {
-              jsessionId <- jsessionCookie.value
-              hsessionId <- hsessionCookie.value
-              hsessionIdCheck <- hashSessionId(jsessionId)
-            } yield {
-              // if the check is correct, use the given sessionID, otherwise create a new one
-              // TODO check against SessionMaster.getSession(Full(jsessionId)) ?
-              if (hsessionId.equals(hsessionIdCheck)) jsessionId
-              else java.util.UUID.randomUUID.toString
-            }
-          case _ =>
-            for {
-              jsessionId <- jsessionCookie.value
-            } yield jsessionId
+  def getSessionId(req: HttpRequest, cookies: List[HTTPCookie]): Box[String] = {
+    cookies.find(_.name == sessionCookieName).flatMap(_.value) match {
+      case Some(sessionCookie) =>
+        val splitted = sessionCookie.split(".")
+
+        val id = splitted(0)
+
+        if(splitted.length > 1) {
+          val signature = splitted(1)
+
+          hashSessionId(id) match {
+            case Full(hash) if hash == signature => Full(id)
+            case _ => Full(generateNewSessionId)
+          }
+        } else {
+          Full(id)
         }
-      case _ => Full(java.util.UUID.randomUUID.toString)
+      case _ => Full(generateNewSessionId)
     }
   }
 
