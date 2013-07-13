@@ -13,10 +13,10 @@ object NettyHttpContext extends HTTPContext with Loggable {
   def path: String = ""
 
   def resource(path: String): URL = {
-    getClass.getResource("/lift-webapp" + path)
+    getClass.getResource(path)
   }
 
-  def resourceAsStream(path: String): InputStream = Option(resource(path)) map(_.openStream) getOrElse null
+  def resourceAsStream(path: String): InputStream = Option(resource(path)) map(_.openStream) orNull
 
   // FIXME  @see{net.liftweb.http.provider.HTTPContext}
   def mimeType(path: String): Box[String] = Some("text/html")
