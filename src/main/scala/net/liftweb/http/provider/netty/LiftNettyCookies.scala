@@ -1,4 +1,4 @@
-package net.liftweb.netty
+package net.liftweb.http.provider.netty
 
 import net.liftweb.util._
 import net.liftweb.common._
@@ -6,7 +6,6 @@ import net.liftweb.http.provider.HTTPCookie
 
 import io.netty.handler.codec.http._
 
-import collection.mutable.{ Set => MSet }
 import collection.convert.WrapAsScala._
 
 

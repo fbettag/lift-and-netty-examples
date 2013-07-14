@@ -1,4 +1,4 @@
-package net.liftweb.netty
+package net.liftweb.http.provider.netty
 
 import net.liftweb.http.provider.HTTPSession
 import net.liftweb.http.LiftSession

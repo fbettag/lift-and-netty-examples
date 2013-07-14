@@ -1,4 +1,4 @@
-package net.liftweb.netty
+package net.liftweb.http.provider.netty
 
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.nio.NioEventLoopGroup

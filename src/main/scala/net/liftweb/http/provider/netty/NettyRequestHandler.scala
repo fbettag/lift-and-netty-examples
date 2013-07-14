@@ -1,4 +1,4 @@
-package net.liftweb.netty
+package net.liftweb.http.provider.netty
 
 import io.netty.channel._
 import io.netty.handler.codec.http._

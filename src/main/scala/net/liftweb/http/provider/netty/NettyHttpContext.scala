@@ -1,4 +1,4 @@
-package net.liftweb.netty
+package net.liftweb.http.provider.netty
 
 import net.liftweb.http.provider.HTTPContext
 import net.liftweb.common.{Loggable, Empty, Box}

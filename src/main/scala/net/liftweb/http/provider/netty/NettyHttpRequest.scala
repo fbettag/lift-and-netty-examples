@@ -1,4 +1,4 @@
-package net.liftweb.netty
+package net.liftweb.http.provider.netty
 
 import net.liftweb.http.provider._
 import net.liftweb.common._
@@ -76,19 +76,19 @@ class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPR
   def authType: Box[String] = throw new Exception("Implement me")
 
   // FIXME not really implemented, @dpp made it false when we started, left comment, "this should be trivial"
-  def suspendResumeSupport_? : Boolean = false
+  def suspendResumeSupport_? : Boolean = true
 
   // FIXME not really implemented, @dpp made it None when we started, left comment, "trivial support"
   def resumeInfo : Option[(Req, LiftResponse)] = None
 
   // FIXME trivial support
-  def suspend(timeout: Long): RetryState.Value = throw new Exception("Implement me")
+  def suspend(timeout: Long): RetryState.Value = RetryState.SUSPENDED //throw new Exception("Implement me")
 
   // FIXME trivial support
-  def resume(what: (Req, LiftResponse)): Boolean = throw new Exception("Implement me")
+  def resume(what: (Req, LiftResponse)): Boolean = true // throw new Exception("Implement me")
 
   // FIXME actually detect multipart content
-  def multipartContent_?(): Boolean = false //
+  def multipartContent_? = false //
 
   // FIXME
   def extractFiles: List[ParamHolder] = throw new Exception("Implement me")
