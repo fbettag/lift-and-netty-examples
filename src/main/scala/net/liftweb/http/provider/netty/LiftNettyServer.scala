@@ -50,7 +50,8 @@ object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
     LiftNettyCookies.start()
     srv.bind().syncUninterruptibly()
     println("Listening on %s:%s".format(addr.getAddress.getHostAddress, addr.getPort))
-        // Add Shutdown Hook to cleanly shutdown Netty
+
+    // Add Shutdown Hook to cleanly shutdown Netty
     Runtime.getRuntime.addShutdownHook(new Thread {
       override def run() { APP.stop() }
     })

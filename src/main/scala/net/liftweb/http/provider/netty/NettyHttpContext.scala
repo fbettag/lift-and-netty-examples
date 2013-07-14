@@ -3,8 +3,7 @@ package net.liftweb.http.provider.netty
 import net.liftweb.http.provider.HTTPContext
 import net.liftweb.common.{Loggable, Empty, Box}
 import java.net.URL
-import java.io.{ InputStream, File }
-import io.netty.handler.codec.http.FullHttpRequest
+import java.io.InputStream
 import scala.collection.concurrent.TrieMap
 
 object NettyHttpContext extends HTTPContext with Loggable {
@@ -16,7 +15,7 @@ object NettyHttpContext extends HTTPContext with Loggable {
     getClass.getResource(path)
   }
 
-  def resourceAsStream(path: String): InputStream = Option(resource(path)) map(_.openStream) orNull
+  def resourceAsStream(path: String): InputStream = Option(resource(path)).map(_.openStream).orNull
 
   // FIXME  @see{net.liftweb.http.provider.HTTPContext}
   def mimeType(path: String): Box[String] = Some("text/html")

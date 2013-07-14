@@ -1,8 +1,6 @@
 package com.something.lift.comet
 
-import net.liftweb.actor._
 import net.liftweb.common._
-import net.liftweb.util._
 import net.liftweb.http._
 import scala.xml._
 import net.liftweb.http.js.JsCmds.SetHtml
