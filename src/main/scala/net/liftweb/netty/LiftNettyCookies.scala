@@ -94,7 +94,7 @@ object LiftNettyCookies extends Loggable {
   def getSessionId(req: HttpRequest, cookies: List[HTTPCookie]): Box[String] = {
     cookies.find(_.name == sessionCookieName).flatMap(_.value) match {
       case Some(sessionCookie) =>
-        val splitted = sessionCookie.split(".")
+        val splitted = sessionCookie.split("\\.")
 
         val id = splitted(0)
 
