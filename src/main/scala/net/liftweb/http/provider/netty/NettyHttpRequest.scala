@@ -14,11 +14,14 @@ import scala.collection.JavaConverters._
 /**
  * The representation of a HTTP request state
  */
-class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPRequest {
+class NettyHttpRequest(val request: FullHttpRequest, val channel: Channel, val response: NettyHttpResponse) extends HTTPRequest {
+
   def provider = LiftNettyServer
 
   lazy val nettyLocalAddress = channel.localAddress.asInstanceOf[InetSocketAddress]
+
   lazy val nettyRemoteAddress = channel.remoteAddress.asInstanceOf[InetSocketAddress]
+
   private val queryStringDecoder = new QueryStringDecoder(request.getUri, CharsetUtil.UTF_8)
 
   val contextPath = ""
@@ -28,15 +31,16 @@ class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPR
   def headers(name: String): List[String] = request.headers().getAll(name).asScala.toList
 
   lazy val headers: List[HTTPParam] = request.headers().names().asScala.map(n => HTTPParam(n, request.headers().get(n))).toList
+
   def context: HTTPContext = LiftNettyServer.context
 
   def contentType: Box[String] = Box !! request.headers().get(HttpHeaders.Names.CONTENT_TYPE)
 
-  def uri: String =  request.getUri
+  def uri: String = request.getUri
 
   def url: String = request.getUri
 
-  def queryString: Box[String] =  Box !! uri.splitAt(uri.indexOf("?") + 1)._2
+  def queryString: Box[String] = Box !! uri.splitAt(uri.indexOf("?") + 1)._2
 
   def param(name: String): List[String] = queryStringDecoder.parameters().get(name).asScala.toList
 
@@ -70,22 +74,31 @@ class NettyHttpRequest(request: FullHttpRequest, channel: Channel) extends HTTPR
   }
 
   // FIXME the session is fake
-  def session: HTTPSession =  new NettyHttpSession
+  def session: HTTPSession = new NettyHttpSession
 
   // FIXME
   def authType: Box[String] = throw new Exception("Implement me")
 
-  // FIXME not really implemented, @dpp made it false when we started, left comment, "this should be trivial"
   def suspendResumeSupport_? : Boolean = true
 
-  // FIXME not really implemented, @dpp made it None when we started, left comment, "trivial support"
-  def resumeInfo : Option[(Req, LiftResponse)] = None
+  def resumeInfo: Option[(Req, LiftResponse)] = None
 
-  // FIXME trivial support
-  def suspend(timeout: Long): RetryState.Value = RetryState.SUSPENDED //throw new Exception("Implement me")
+  def suspend(timeout: Long): RetryState.Value = {
+    /*
+     * Since Netty communicates over channels, and we already
+     * have a reference to the channel for this request, nothing
+     * to do
+     */
+    RetryState.SUSPENDED
+  }
 
-  // FIXME trivial support
-  def resume(what: (Req, LiftResponse)): Boolean = true // throw new Exception("Implement me")
+  def resume(what: (Req, LiftResponse)): Boolean = {
+    what match {
+      case (req, resp) =>
+        this.provider.liftServlet.sendResponse(resp, this.response, req)
+        true
+    }
+  }
 
   // FIXME actually detect multipart content
   def multipartContent_? = false //

@@ -68,8 +68,8 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
           try {
             transientVarProvider(Empty,
               reqVarProvider(Empty, {
-                val httpRequest: HTTPRequest = new NettyHttpRequest(req, ctx.channel)
                 val httpResponse = new NettyHttpResponse(ctx.channel, keepAlive)
+                val httpRequest: HTTPRequest = new NettyHttpRequest(req, ctx.channel, httpResponse)
 
                 handleLoanWrappers(LiftNettyServer.liftService(httpRequest, httpResponse) {
                   doNotHandled()
