@@ -2,36 +2,107 @@ package net.liftweb.http.provider.netty
 
 import net.liftweb.http.provider.HTTPSession
 import net.liftweb.http.LiftSession
+import scala.collection.concurrent.TrieMap
+import net.liftweb.common.Box
+import net.liftweb.actor.{LAPinger, LiftActor}
+import java.util.{Date, Calendar}
+import scala.collection.immutable.HashMap
 
-class NettyHttpSession extends HTTPSession {
+case class NettyHttpSession(val sessionId: String) extends HTTPSession {
 
-  // FIXME return a real session id when supported
-  def sessionId: String = ""
+  private val LiftMagicID = "$lift_magic_session_thingy$"
 
   // FIXME implement me for realz
-  def link(liftSession: LiftSession) {}
+  def link(liftSession: LiftSession) =
+    setAttribute(LiftMagicID, liftSession)
 
   // FIXME
-  def unlink(liftSession: LiftSession) = throw new Exception("implement me")
+  def unlink(liftSession: LiftSession) =
+    removeAttribute(LiftMagicID)
 
-  // FIXME this is just an arbitrary value to get things running
-  def maxInactiveInterval: Long = 100
+  private var _maxInactiveInterval= 10l * 1000l
+
+  /**
+   * Default of 10 minutes
+   */
+  def maxInactiveInterval: Long = _maxInactiveInterval
 
   // FIXME
-  def setMaxInactiveInterval(interval: Long) = throw new Exception("implement me")
+  def setMaxInactiveInterval(interval: Long) = _maxInactiveInterval = interval
 
   // FIXME return real time when sessions are supported
   def lastAccessedTime: Long = System.currentTimeMillis
 
-  // FIXME
-  def setAttribute(name: String, value: Any) = throw new Exception("implement me")
+  def expires: Date = {
+    val calendar = Calendar.getInstance()
+    calendar.setTimeInMillis(lastAccessedTime)
+    calendar.add(Calendar.MILLISECOND, maxInactiveInterval.toInt)
+    calendar.getTime
+  }
 
-  // FIXME
-  def attribute(name: String): Any = throw new Exception("implement me")
+  val _attributes = TrieMap.empty[String, Any]
 
-  // FIXME
-  def removeAttribute(name: String) { throw new Exception("implement me") }
+  def attribute(name: String): Box[Any] = _attributes.get(name)
 
-  // FIXME
-  def terminate { throw new Exception("implement me") }
+  def setAttribute(name: String, value: Any) = _attributes.put(name, value)
+
+  def removeAttribute(name: String) = _attributes.remove(name)
+
+  def terminate() = {
+    _attributes.clear()
+    NettyHttpSession ! NettyHttpSession.SessionTerminated(this)
+  }
+
+}
+
+object NettyHttpSession extends LiftActor {
+
+  import net.liftweb.util.Helpers._
+
+  //Volatile so lookups can be done from other threads
+  @volatile var sessions = HashMap.empty[String, NettyHttpSession]
+
+  private var cleanupScheduled = false
+
+  protected def messageHandler: PartialFunction[Any, Unit] = {
+    case m: Message => m match {
+      case RegisterSession(session) =>
+        sessions += (session.sessionId -> session)
+        if(!cleanupScheduled) {
+          scheduleCleanup()
+          cleanupScheduled
+        }
+      case SessionTerminated(session) =>
+        sessions -= session.sessionId
+      case CleanupSessions =>
+        cleanupScheduled = false
+        val now = Calendar.getInstance().getTime
+        sessions foreach { case(id, s) =>
+          if(s.expires.before(now)) {
+            println(s"Expiring session ${id} for inactivity")
+            s.terminate()
+          }
+        }
+        if(!sessions.isEmpty)
+          scheduleCleanup()
+    }
+  }
+
+  def find(sessionId: String) = sessions.values.find(_.sessionId == sessionId)
+
+  private def scheduleCleanup() = {
+    LAPinger.schedule(this, CleanupSessions, 30.seconds)
+    cleanupScheduled = true
+  }
+
+  scheduleCleanup()
+
+  sealed trait Message
+
+  case class RegisterSession(session: NettyHttpSession) extends Message
+
+  case class SessionTerminated(session: NettyHttpSession) extends Message
+
+  object CleanupSessions extends Message
+
 }

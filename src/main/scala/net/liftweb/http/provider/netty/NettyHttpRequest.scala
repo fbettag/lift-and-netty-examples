@@ -14,7 +14,7 @@ import scala.collection.JavaConverters._
 /**
  * The representation of a HTTP request state
  */
-class NettyHttpRequest(val request: FullHttpRequest, val channel: Channel, val response: NettyHttpResponse) extends HTTPRequest {
+class NettyHttpRequest(val request: FullHttpRequest, val channel: Channel, val response: NettyHttpResponse) extends HTTPRequest with Loggable {
 
   def provider = LiftNettyServer
 
@@ -49,9 +49,7 @@ class NettyHttpRequest(val request: FullHttpRequest, val channel: Channel, val r
   lazy val paramNames: List[String] = queryStringDecoder.parameters().asScala.map(_._1).toList
 
   // not needed for netty
-  def destroyServletSession() {}
-
-  def sessionId: Box[String] = LiftNettyCookies.getSessionId(request, cookies)
+  def destroyServletSession() = session.terminate
 
   def remoteAddress: String = nettyRemoteAddress.toString
 
@@ -73,8 +71,31 @@ class NettyHttpRequest(val request: FullHttpRequest, val channel: Channel, val r
     new ByteArrayInputStream(arr)
   }
 
-  // FIXME the session is fake
-  def session: HTTPSession = new NettyHttpSession
+  def sessionId: Box[String] = LiftNettyCookies.getSessionId(request, cookies)
+
+  lazy val session: HTTPSession = {
+
+    def newSession = {
+      val newSessionId = LiftNettyCookies.generateNewSessionId
+      response.addCookies(List(HTTPCookie(LiftNettyCookies.sessionCookieName, newSessionId)))
+      println(s"Creating new session ${newSessionId} because no cookie was found in ${NettyHttpSession.sessions}, or no corresponding session")
+      val session = NettyHttpSession(newSessionId)
+      NettyHttpSession ! NettyHttpSession.RegisterSession(session)
+      session
+    }
+
+    sessionId match {
+      case Full(sessionId) =>
+        NettyHttpSession.find(sessionId) getOrElse newSession
+      case other =>
+        other match {
+          case f: Failure => logger.warn("Problem retrieving session id", f)
+          case _ => ()
+        }
+        newSession
+    }
+
+  }
 
   // FIXME
   def authType: Box[String] = throw new Exception("Implement me")
