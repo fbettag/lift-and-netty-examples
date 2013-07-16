@@ -4,16 +4,30 @@ import net.liftweb.common._
 import net.liftweb.http._
 import scala.xml._
 import net.liftweb.http.js.JsCmds.SetHtml
+import net.liftweb.actor.LAPinger
+import net.liftweb.util.Helpers._
+import java.text.SimpleDateFormat
+import java.util.Date
 
 class CometTest extends CometActor {
 
-  override def defaultPrefix = Full("comet-test-prefix")
+  object Update
 
-  override def messageHandler = {
-    case a: String => partialUpdate(SetHtml("comet-test-output", Text(a)))
+  override protected def localSetup() {
+    super.localSetup()
+    scheduleUpdate()
   }
 
-  def render = {
-    "#comet-test-input" #> SHtml.ajaxText("Input here", (x) => this ! x)
+  def scheduleUpdate() = LAPinger.schedule(this, Update, 5.seconds)
+
+  def theDate = new SimpleDateFormat("hh:mm:ss").format(new Date())
+
+  override def lowPriority = super.lowPriority orElse {
+    case Update =>
+      partialUpdate(SetHtml("the-time", new Text(theDate)))
+      scheduleUpdate()
   }
+
+  def render = "#the-time *" #> theDate
+
 }

@@ -1,14 +1,15 @@
 <html>
 <head>
     <title>hello</title>
+    <script src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
 </head>
 <body>
-    <div lift="Test">It worked!</div>
-    <div>
-        <lift:comet type="CometTest">
-            Input: <input id="comet-test-input" type="text"/><br/>
-            Output: <b id="comet-test-output">(nothing yet)</b>
-        </lift:comet>
+    <div data-lift="comet?type=CometTest">
+        <span>It is currently
+          <span id="the-time">
+            {theDate}
+          </span>
+        </span>
     </div>
 </body>
 </html>
