@@ -89,12 +89,14 @@ class NettyHttpRequest(val request: FullHttpRequest, val channel: Channel, val r
      * have a reference to the channel for this request, nothing
      * to do
      */
+    println("Suspending request")
     RetryState.SUSPENDED
   }
 
   def resume(what: (Req, LiftResponse)): Boolean = {
     what match {
       case (req, resp) =>
+        println("Resuming request")
         this.provider.liftServlet.sendResponse(resp, this.response, req)
         true
     }

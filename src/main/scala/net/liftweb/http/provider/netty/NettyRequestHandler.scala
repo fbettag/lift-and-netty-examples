@@ -60,8 +60,8 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
           ctx.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE))
         }
 
-        def doNotHandled() {
-          logger.warn("do not handled called")
+        def doNotHandled(httpRequest: NettyHttpRequest) {
+          logger.warn("do not handled called for " + httpRequest.uri)
         }
 
         Schedule(() => {
@@ -69,10 +69,10 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
             transientVarProvider(Empty,
               reqVarProvider(Empty, {
                 val httpResponse = new NettyHttpResponse(ctx.channel, keepAlive)
-                val httpRequest: HTTPRequest = new NettyHttpRequest(req, ctx.channel, httpResponse)
+                val httpRequest = new NettyHttpRequest(req, ctx.channel, httpResponse)
 
                 handleLoanWrappers(LiftNettyServer.liftService(httpRequest, httpResponse) {
-                  doNotHandled()
+                  doNotHandled(httpRequest)
                 })
               }))
           } catch {

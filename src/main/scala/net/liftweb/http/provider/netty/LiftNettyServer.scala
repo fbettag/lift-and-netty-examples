@@ -64,7 +64,7 @@ object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
       Helpers.tryo {
         LiftRules.early.toList.foreach(_(req))
       }
-
+      println("Servicing " + req.uri)
       CurrentHTTPReqResp.doWith(req -> resp) {
         val newReq = Req(req, LiftRules.statelessRewrite.toList,
           Nil,
@@ -72,11 +72,16 @@ object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
           System.nanoTime)
 
         CurrentReq.doWith(newReq) {
-          URLRewriter.doWith(url =>
+          println("CurrentReq.doWith " + req.uri)
+          URLRewriter.doWith({ url =>
+            println("URLRewriter.doWith " + req.uri)
             NamedPF.applyBox(resp.encodeUrl(url),
               LiftRules.urlDecorate.toList) openOr
-              resp.encodeUrl(url)) {
-            if (isLiftRequest_?(newReq)) super.service(req, resp)(chain)
+              resp.encodeUrl(url)}) {
+            if (isLiftRequest_?(newReq)) {
+              println("Servicing lift request " + req.uri)
+              super.service(req, resp)(chain)
+            }
             else {
               logger.warn("this should be handled by netty as static file as it is not handled by lift/jar")
               chain
