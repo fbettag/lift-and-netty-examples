@@ -78,7 +78,6 @@ class NettyHttpRequest(val request: FullHttpRequest, val channel: Channel, val r
     def newSession = {
       val newSessionId = LiftNettyCookies.generateNewSessionId
       response.addCookies(List(HTTPCookie(LiftNettyCookies.sessionCookieName, newSessionId)))
-      println(s"Creating new session ${newSessionId} because no cookie was found in ${NettyHttpSession.sessions}, or no corresponding session")
       val session = NettyHttpSession(newSessionId)
       NettyHttpSession ! NettyHttpSession.RegisterSession(session)
       session
@@ -104,21 +103,28 @@ class NettyHttpRequest(val request: FullHttpRequest, val channel: Channel, val r
 
   def resumeInfo: Option[(Req, LiftResponse)] = None
 
+  var suspended = false
+
   def suspend(timeout: Long): RetryState.Value = {
     /*
      * Since Netty communicates over channels, and we already
      * have a reference to the channel for this request, nothing
      * to do
      */
-    println("Suspending request")
+    suspended = true
     RetryState.SUSPENDED
   }
 
   def resume(what: (Req, LiftResponse)): Boolean = {
     what match {
       case (req, resp) =>
-        println("Resuming request")
         this.provider.liftServlet.sendResponse(resp, this.response, req)
+        /*
+         * The liftServlet does not always close the output stream
+         */
+        if(!this.response.streamClosed)
+          this.response.outputStream.close()
+        suspended = false
         true
     }
   }

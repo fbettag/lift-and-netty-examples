@@ -18,22 +18,16 @@ class CometTest extends CometActor {
     scheduleUpdate()
   }
 
-  def scheduleUpdate() = LAPinger.schedule(this, Update, 15.seconds)
+  def scheduleUpdate() = LAPinger.schedule(this, Update, 5.seconds)
 
   def theDate = new SimpleDateFormat("hh:mm:ss").format(new Date())
 
   override def lowPriority = super.lowPriority orElse {
     case Update =>
-      println("Comet received an update message")
-      partialUpdate(SetHtml("comet-test-output", new Text(theDate)))
+      partialUpdate(SetHtml("the-time", new Text(theDate)))
       scheduleUpdate()
   }
 
-  def render = {
-    <span>It is currently
-      <span id="the-time">
-        {theDate}
-      </span>
-    </span>
-  }
+  def render = "#the-time *" #> theDate
+
 }

@@ -6,6 +6,7 @@ import scala.collection.concurrent.TrieMap
 import net.liftweb.common.Box
 import net.liftweb.actor.{LAPinger, LiftActor}
 import java.util.{Date, Calendar}
+import net.liftweb.util.Helpers._
 import scala.collection.immutable.HashMap
 
 case class NettyHttpSession(val sessionId: String) extends HTTPSession {
@@ -20,7 +21,7 @@ case class NettyHttpSession(val sessionId: String) extends HTTPSession {
   def unlink(liftSession: LiftSession) =
     removeAttribute(LiftMagicID)
 
-  private var _maxInactiveInterval= 10l * 1000l
+  private var _maxInactiveInterval= 2.minutes
 
   /**
    * Default of 10 minutes
@@ -30,8 +31,15 @@ case class NettyHttpSession(val sessionId: String) extends HTTPSession {
   // FIXME
   def setMaxInactiveInterval(interval: Long) = _maxInactiveInterval = interval
 
+  @volatile var _lastAccessedTime = System.currentTimeMillis
+
+  private[netty] def touch() = {
+    _lastAccessedTime = System.currentTimeMillis
+    this
+  }
+
   // FIXME return real time when sessions are supported
-  def lastAccessedTime: Long = System.currentTimeMillis
+  def lastAccessedTime: Long = _lastAccessedTime
 
   def expires: Date = {
     val calendar = Calendar.getInstance()
@@ -79,7 +87,6 @@ object NettyHttpSession extends LiftActor {
         val now = Calendar.getInstance().getTime
         sessions foreach { case(id, s) =>
           if(s.expires.before(now)) {
-            println(s"Expiring session ${id} for inactivity")
             s.terminate()
           }
         }
