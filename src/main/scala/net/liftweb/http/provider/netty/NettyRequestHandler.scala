@@ -54,25 +54,32 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
   def messageReceived(ctx: ChannelHandlerContext, msg: Object) {
     msg match {
       case req: FullHttpRequest =>
+
         val keepAlive = HttpHeaders.isKeepAlive(req)
 
         if (HttpHeaders.is100ContinueExpected(req)) {
           ctx.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE))
         }
 
-        def doNotHandled() {
-          logger.warn("do not handled called")
+        //FIXME: Needs to serve pages from disk
+        def doNotHandled(httpRequest: NettyHttpRequest) {
+          logger.warn("do not handled called for " + httpRequest.uri)
         }
 
         Schedule(() => {
           try {
             transientVarProvider(Empty,
               reqVarProvider(Empty, {
-                val httpRequest: HTTPRequest = new NettyHttpRequest(req, ctx.channel)
                 val httpResponse = new NettyHttpResponse(ctx.channel, keepAlive)
-
+                val httpRequest = new NettyHttpRequest(req, ctx.channel, httpResponse)
+                /*
+                 * Update the last accessed time on any existing session
+                 */
+                for(sid <- httpRequest.sessionId; session <- NettyHttpSession.find(sid)) {
+                  session.touch()
+                }
                 handleLoanWrappers(LiftNettyServer.liftService(httpRequest, httpResponse) {
-                  doNotHandled()
+                  doNotHandled(httpRequest)
                 })
               }))
           } catch {

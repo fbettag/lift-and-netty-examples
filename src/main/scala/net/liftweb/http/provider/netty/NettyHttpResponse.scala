@@ -17,6 +17,7 @@ import net.liftweb.http.LiftRules
 class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPResponse {
 
   val nettyHeaders = new DefaultHttpHeaders()
+
   private var responseStatus: HttpResponseStatus = HttpResponseStatus.OK
 
   private var cookies = List[HTTPCookie]()
@@ -43,14 +44,14 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
 
   def setStatusWithReason(status: Int, reason: String): Unit = responseStatus = new HttpResponseStatus(status, reason)
 
+  private[netty] var streamClosed = false
 
   // TODO better flush
   def outputStream: OutputStream = new OutputStream {
 
     var last: Option[ChannelFuture] = None
-    def writeBuffer(buffer: ByteBuf) = if (buffer.isReadable) {
-      println(s"Writing buffer of size ${buffer.readableBytes()}")
 
+    def writeBuffer(buffer: ByteBuf) = if (buffer.isReadable) {
       last match {
         case None =>
           val nettyResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
@@ -97,7 +98,6 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
 
     override def flush() {
       last foreach { future =>
-        println("Flushing channel")
         future.awaitUninterruptibly()
         if(!future.isSuccess)
           throw new IOException("Error writing to channel", future.cause())
@@ -109,7 +109,7 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
         flush()
       } finally {
         channel.close().awaitUninterruptibly()
-        println("Closed channel")
+        streamClosed = true
       }
     }
 
