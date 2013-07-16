@@ -60,11 +60,10 @@ object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
     srv
   }
 
-  def liftService(req : HTTPRequest, resp : HTTPResponse)(chain : => Unit) = {
+  def liftService(req : NettyHttpRequest, resp : NettyHttpResponse)(chain : => Unit) = {
       Helpers.tryo {
         LiftRules.early.toList.foreach(_(req))
       }
-
       CurrentHTTPReqResp.doWith(req -> resp) {
         val newReq = Req(req, LiftRules.statelessRewrite.toList,
           Nil,
@@ -72,11 +71,19 @@ object LiftNettyServer extends App with HTTPProvider with Loggable { APP =>
           System.nanoTime)
 
         CurrentReq.doWith(newReq) {
-          URLRewriter.doWith(url =>
+          URLRewriter.doWith({ url =>
             NamedPF.applyBox(resp.encodeUrl(url),
               LiftRules.urlDecorate.toList) openOr
-              resp.encodeUrl(url)) {
-            if (isLiftRequest_?(newReq)) super.service(req, resp)(chain)
+              resp.encodeUrl(url)}) {
+            if (isLiftRequest_?(newReq)) {
+              super.service(req, resp)(chain)
+              /*
+               * Lift doesn't seem to close the output stream in at least some situations.
+               * We need to close it explicitly *unless the request is suspended*
+               */
+              if(!req.suspended && !resp.streamClosed)
+                  resp.outputStream.close()
+            }
             else {
               logger.warn("this should be handled by netty as static file as it is not handled by lift/jar")
               chain

@@ -39,7 +39,7 @@ object LiftNettyCookies extends Loggable {
     algorithm <- algo
     secretKey <- secret
     mac <- Helpers.tryo(javax.crypto.Mac.getInstance(algorithm)) match {
-      case f @ Full(algorithm) => f
+      case f@Full(algorithm) => f
       case _ =>
         logger.warn("Invalid Cookie Algorithm '%s'. Hashing disabled.")
         Empty
@@ -52,9 +52,9 @@ object LiftNettyCookies extends Loggable {
   private def hashSessionId(id: String) = for {
     mac <- mac
   } yield Helpers.base64Encode(mac.doFinal(id.getBytes))
-  
+
   def addSessionId(resp: HttpResponse, id: String) {
-    resp.headers.add("Set-Cookie", 
+    resp.headers.add("Set-Cookie",
       hashSessionId(id) match {
         case Full(hsid) =>
           ServerCookieEncoder.encode(
@@ -84,30 +84,27 @@ object LiftNettyCookies extends Loggable {
     Option(cookie.isSecure)
   )
 
-  def generateNewSessionId = _random.synchronized { 
+  def generateNewSessionId = _random.synchronized {
     val array = new Array[Byte](24)
     _random.nextBytes(array)
     Helpers.base64Encode(array)
   }
 
   def getSessionId(req: HttpRequest, cookies: List[HTTPCookie]): Box[String] = {
-    cookies.find(_.name == sessionCookieName).flatMap(_.value) match {
-      case Some(sessionCookie) =>
-        val splitted = sessionCookie.split("\\.")
-
-        val id = splitted(0)
-
-        if(splitted.length > 1) {
-          val signature = splitted(1)
-
+    cookies.find(_.name == sessionCookieName).flatMap(_.value) flatMap { sessionCookie =>
+        val split = sessionCookie.split("\\.")
+        val id = split(0)
+        if (split.length > 1) {
+          val signature = split(1)
           hashSessionId(id) match {
             case Full(hash) if hash == signature => Full(id)
-            case _ => Full(generateNewSessionId)
+            case Full(hash) => Failure("Hash did not match")
+            case Empty => Full(id) //hashing could be disabled
+            case f: Failure => f
           }
         } else {
           Full(id)
         }
-      case _ => Full(generateNewSessionId)
     }
   }
 
