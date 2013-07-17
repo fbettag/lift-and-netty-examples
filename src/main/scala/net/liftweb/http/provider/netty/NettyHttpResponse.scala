@@ -58,12 +58,12 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
           for (c <- cookies) {
             val cookie = new DefaultCookie(c.name, c.value openOr null)
 
-            c.domain foreach (cookie.setDomain(_))
-            c.path foreach (cookie.setPath(_))
-            c.maxAge foreach (cookie.setMaxAge(_))
-            c.version foreach (cookie.setVersion(_))
-            c.secure_? foreach (cookie.setSecure(_))
-            c.httpOnly foreach (cookie.setHttpOnly(_))
+            c.domain foreach cookie.setDomain
+            c.path foreach cookie.setPath
+            c.maxAge foreach (cookie.setMaxAge(_)) // weird workaround
+            c.version foreach cookie.setVersion
+            c.secure_? foreach cookie.setSecure
+            c.httpOnly foreach cookie.setHttpOnly
             nettyHeaders.add(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode(cookie))
           }
           nettyResponse.setStatus(responseStatus)
@@ -80,6 +80,8 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
           if (!keepAlive) f.addListener(ChannelFutureListener.CLOSE)
           last = Some(f)
       }
+
+      channel.flush
     }
 
     def write(i: Int) {
@@ -97,6 +99,7 @@ class NettyHttpResponse(channel: Channel, keepAlive: Boolean) extends HTTPRespon
     }
 
     override def flush() {
+      channel.flush()
       last foreach { future =>
         future.awaitUninterruptibly()
         if(!future.isSuccess)

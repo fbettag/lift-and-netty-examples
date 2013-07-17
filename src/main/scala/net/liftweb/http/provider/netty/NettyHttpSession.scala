@@ -56,7 +56,7 @@ case class NettyHttpSession(val sessionId: String) extends HTTPSession {
 
   def removeAttribute(name: String) = _attributes.remove(name)
 
-  def terminate() = {
+  def terminate = {
     _attributes.clear()
     NettyHttpSession ! NettyHttpSession.SessionTerminated(this)
   }
@@ -87,7 +87,7 @@ object NettyHttpSession extends LiftActor {
         val now = Calendar.getInstance().getTime
         sessions foreach { case(id, s) =>
           if(s.expires.before(now)) {
-            s.terminate()
+            s.terminate
           }
         }
         if(!sessions.isEmpty)

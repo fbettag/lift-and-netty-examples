@@ -11,7 +11,7 @@ import net.liftweb.http.{LiftSession, LiftRules, LiftServlet}
  * Handles incoming requests which will be sent to an AuthActor
  */
 @ChannelHandler.Sharable
-object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
+object NettyRequestHandler extends SimpleChannelInboundHandler[Object] with Loggable {
 
   private def findObject(cls: String): Box[AnyRef] =
     Helpers.tryo[Class[_]](Nil)(Class.forName(cls + "$")).flatMap {
@@ -45,20 +45,16 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
     logger.debug("client disconnected")
   }
 
-  override def messageReceived(ctx: ChannelHandlerContext, msgs: MessageList[Object]) {
-    val iter = msgs.iterator
-    while (iter.hasNext) messageReceived(ctx, iter.next)
-    msgs.clear
-  }
-
-  def messageReceived(ctx: ChannelHandlerContext, msg: Object) {
+  def channelRead0(ctx: ChannelHandlerContext, msg: Object) {
     msg match {
       case req: FullHttpRequest =>
+        req.retain
 
         val keepAlive = HttpHeaders.isKeepAlive(req)
 
         if (HttpHeaders.is100ContinueExpected(req)) {
           ctx.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE))
+          ctx.flush()
         }
 
         //FIXME: Needs to serve pages from disk
@@ -87,7 +83,10 @@ object NettyRequestHandler extends ChannelInboundHandlerAdapter with Loggable {
               excp.printStackTrace()
               val future = ctx.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST))
               if (!keepAlive) future.addListener(ChannelFutureListener.CLOSE)
+              ctx.flush()
             }
+          } finally {
+            req.release()
           }
         })
     }

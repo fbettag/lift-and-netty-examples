@@ -34,7 +34,7 @@ class ProtoNegoHandler(
     }
   }
 
-  override def decode(ctx: ChannelHandlerContext, buffer: ByteBuf, msgsOut: MessageList[Object]) {
+  override def decode(ctx: ChannelHandlerContext, buffer: ByteBuf, out: java.util.List[Object]) {
     // Will use the first two bytes to detect a protocol.
     if (buffer.readableBytes() < 5) return
 
