@@ -13,22 +13,19 @@ case class NettyHttpSession(val sessionId: String) extends HTTPSession {
 
   private val LiftMagicID = "$lift_magic_session_thingy$"
 
-  // FIXME implement me for realz
   def link(liftSession: LiftSession) =
     setAttribute(LiftMagicID, liftSession)
 
-  // FIXME
   def unlink(liftSession: LiftSession) =
     removeAttribute(LiftMagicID)
 
-  private var _maxInactiveInterval= 2.minutes
+  private var _maxInactiveInterval= 20.minutes
 
   /**
-   * Default of 10 minutes
+   * Default of 20 minutes
    */
   def maxInactiveInterval: Long = _maxInactiveInterval
 
-  // FIXME
   def setMaxInactiveInterval(interval: Long) = _maxInactiveInterval = interval
 
   @volatile var _lastAccessedTime = System.currentTimeMillis
@@ -38,7 +35,6 @@ case class NettyHttpSession(val sessionId: String) extends HTTPSession {
     this
   }
 
-  // FIXME return real time when sessions are supported
   def lastAccessedTime: Long = _lastAccessedTime
 
   def expires: Date = {
