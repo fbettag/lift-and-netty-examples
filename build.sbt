@@ -30,7 +30,7 @@ libraryDependencies ++= Seq(
   "net.liftweb"         %%  "lift-webkit"       % "2.5"               % "compile",
   //"org.eclipse.jetty"   %   "jetty-webapp"      % "7.6.11.v20130520",
   "ch.qos.logback"      %   "logback-classic"   % "1.0.0"             % "compile",
-  "io.netty"            %   "netty-all"         % "4.0.1.Final"
+  "io.netty"            %   "netty-all"         % "4.0.3.Final"
 )
 
 // to put webapp content to root of jar
