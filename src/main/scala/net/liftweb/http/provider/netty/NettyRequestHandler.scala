@@ -2,10 +2,18 @@ package net.liftweb.http.provider.netty
 
 import io.netty.channel._
 import io.netty.handler.codec.http._
-import net.liftweb.common.{Loggable, Box, Empty}
+import io.netty.handler.codec.http.HttpHeaders._
+import net.liftweb.common.{Full, Loggable, Box, Empty}
 import net.liftweb.http.provider.{HTTPProvider, HTTPRequest}
 import net.liftweb.util.{Helpers, Schedule}
 import net.liftweb.http.{LiftSession, LiftRules, LiftServlet}
+import org.apache.tika.config.TikaConfig
+import org.apache.tika.io.TikaInputStream
+import org.apache.tika.metadata.{TikaCoreProperties, Metadata}
+import org.apache.tika.mime.MediaType
+import io.netty.buffer.Unpooled
+import com.google.common.io.ByteStreams
+import io.netty.util.CharsetUtil
 
 /**
  * Handles incoming requests which will be sent to an AuthActor
@@ -57,9 +65,31 @@ object NettyRequestHandler extends SimpleChannelInboundHandler[Object] with Logg
           ctx.flush()
         }
 
-        //FIXME: Needs to serve pages from disk
         def doNotHandled(httpRequest: NettyHttpRequest) {
-          logger.warn("do not handled called for " + httpRequest.uri)
+          Option(getClass.getResource(httpRequest.uri)) match {
+            case Some(res) =>
+              val config = TikaConfig.getDefaultConfig
+              val detector = config.getDetector
+
+              val stream = TikaInputStream.get(res)
+
+              val metadata = new Metadata()
+              metadata.add(TikaCoreProperties.TITLE, httpRequest.uri.split("/").last)
+              val mediaType = detector.detect(stream, metadata)
+
+              val buffer = Unpooled.wrappedBuffer(ByteStreams.toByteArray(res.openStream()))
+              val resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buffer)
+              setContentLength(resp, buffer.readableBytes)
+              resp.headers.set(HttpHeaders.Names.CONTENT_TYPE, mediaType.getType)
+              if (!keepAlive) resp.headers.set(HttpHeaders.Names.CONNECTION, Values.CLOSE)
+              val future = ctx.write(resp)
+              if (!keepAlive) future.addListener(ChannelFutureListener.CLOSE)
+              ctx.flush()
+            case _ =>
+              val future = ctx.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND))
+              if (!keepAlive) future.addListener(ChannelFutureListener.CLOSE)
+              ctx.flush()
+          }
         }
 
         Schedule(() => {

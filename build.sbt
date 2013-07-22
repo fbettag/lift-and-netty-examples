@@ -28,9 +28,10 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "net.liftweb"         %%  "lift-webkit"       % "2.5"               % "compile",
-  //"org.eclipse.jetty"   %   "jetty-webapp"      % "7.6.11.v20130520",
   "ch.qos.logback"      %   "logback-classic"   % "1.0.0"             % "compile",
-  "io.netty"            %   "netty-all"         % "4.0.3.Final"
+  "io.netty"            %   "netty-all"         % "4.0.4.Final-SNAPSHOT",
+  "org.apache.tika"     %   "tika-parsers"      % "1.4",
+  "com.google.guava"    %   "guava"             % "14.0.1"
 )
 
 // to put webapp content to root of jar
