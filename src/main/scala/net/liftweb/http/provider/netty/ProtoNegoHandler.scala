@@ -52,7 +52,6 @@ class ProtoNegoHandler(
       }*/
 
       p.addLast("nego_gzip", new ProtoNegoHandler(false, detectGzip))
-      buffer.retain
       p.remove(this)
     } else if (detectGzip) {
       // disable auto-read on the channel until authentication has finished
@@ -64,7 +63,6 @@ class ProtoNegoHandler(
         p.addLast("gzipinflater", ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP))
       }
       p.addLast("nego_http", new ProtoNegoHandler(detectSsl, false))
-      buffer.retain
       p.remove(this)
     } else if (isHttp(magic1, magic2)) {
       import ProtoNegoHandler._
@@ -73,7 +71,6 @@ class ProtoNegoHandler(
       p.addLast("encoder", new HttpResponseEncoder())
       if (detectGzip) p.addLast("deflater", new HttpContentCompressor())
       p.addLast("requestHandler", NettyRequestHandler)
-      buffer.retain
       p.remove(this)
     } else {
       ProtoNegoHandler.info("unknown protocol: " + ctx.channel.remoteAddress.asInstanceOf[java.net.InetSocketAddress].getAddress.getHostAddress)

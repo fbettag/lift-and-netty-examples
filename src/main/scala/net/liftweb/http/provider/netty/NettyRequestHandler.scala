@@ -61,8 +61,7 @@ object NettyRequestHandler extends SimpleChannelInboundHandler[Object] with Logg
         val keepAlive = HttpHeaders.isKeepAlive(req)
 
         if (HttpHeaders.is100ContinueExpected(req)) {
-          ctx.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE))
-          ctx.flush()
+          ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE))
         }
 
         def doNotHandled(httpRequest: NettyHttpRequest) {
@@ -82,13 +81,11 @@ object NettyRequestHandler extends SimpleChannelInboundHandler[Object] with Logg
               setContentLength(resp, buffer.readableBytes)
               resp.headers.set(HttpHeaders.Names.CONTENT_TYPE, mediaType.getType)
               if (!keepAlive) resp.headers.set(HttpHeaders.Names.CONNECTION, Values.CLOSE)
-              val future = ctx.write(resp)
+              val future = ctx.writeAndFlush(resp)
               if (!keepAlive) future.addListener(ChannelFutureListener.CLOSE)
-              ctx.flush()
             case _ =>
-              val future = ctx.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND))
+              val future = ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND))
               if (!keepAlive) future.addListener(ChannelFutureListener.CLOSE)
-              ctx.flush()
           }
         }
 
@@ -111,9 +108,8 @@ object NettyRequestHandler extends SimpleChannelInboundHandler[Object] with Logg
           } catch {
             case excp: Throwable => {
               excp.printStackTrace()
-              val future = ctx.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST))
+              val future = ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST))
               if (!keepAlive) future.addListener(ChannelFutureListener.CLOSE)
-              ctx.flush()
             }
           } finally {
             req.release()

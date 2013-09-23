@@ -5,9 +5,10 @@ import net.liftweb.common._
 import net.liftweb.http.{ParamHolder, LiftResponse, Req}
 import java.util.Locale
 import java.net.{URI, InetSocketAddress}
-import java.io.{ByteArrayInputStream, InputStream}
+import java.io.InputStream
 import io.netty.handler.codec.http.{CookieDecoder, QueryStringDecoder, HttpHeaders, FullHttpRequest}
 import io.netty.channel.Channel
+import io.netty.buffer.ByteBufInputStream
 import io.netty.util.CharsetUtil
 import scala.collection.JavaConverters._
 
@@ -65,11 +66,7 @@ class NettyHttpRequest(val request: FullHttpRequest, val channel: Channel, val r
 
   def method: String = request.getMethod.toString
 
-  lazy val inputStream: InputStream = {
-    val arr = Array[Byte]()
-    request.content().getBytes(0, arr)
-    new ByteArrayInputStream(arr)
-  }
+  lazy val inputStream: InputStream = new ByteBufInputStream(request.content)
 
   def sessionId: Box[String] = LiftNettyCookies.getSessionId(request, cookies)
 
