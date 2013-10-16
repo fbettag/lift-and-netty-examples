@@ -45,11 +45,11 @@ class ProtoNegoHandler(
     if (detectSsl) {
 
       // Check for encrypted bytes
-      if (SslHandler.isEncrypted(buffer)) {
+      /*if (SslHandler.isEncrypted(buffer)) {
         val engine = Server.service.sslManager.createSSLEngine
         engine.setEnableSessionCreation(true)
         p.addLast("ssl", new SslHandler(engine))
-      }
+      }*/
 
       p.addLast("nego_gzip", new ProtoNegoHandler(false, detectGzip))
       p.remove(this)

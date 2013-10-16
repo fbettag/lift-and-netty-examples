@@ -18,8 +18,7 @@ class Boot extends Loggable {
 
     // Build SiteMap
     LiftRules.setSiteMap(SiteMap(
-      Menu.i("Home") / "index",
-      Menu.i("Comet") / "comet"
+      Menu.i("Home") / "index"
     ))
 
     LiftRules.explicitlyParsedSuffixes = Set("htm", "html", "shtml")

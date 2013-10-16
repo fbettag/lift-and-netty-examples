@@ -6,5 +6,5 @@ import java.util.Date
 
 class Test {
   def theDate = new SimpleDateFormat("hh:mm:ss").format(new Date())
-  def render = "#the-time *" #> theDate
+  def render = "#snippet-time *" #> theDate
 }

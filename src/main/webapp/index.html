@@ -1,15 +1,14 @@
 <html>
 <head>
-    <title>hello</title>
+    <title>Liftweb on Netty 4!</title>
     <script src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
 </head>
 <body>
     <div data-lift="Test">
-        <span>It is currently
-          <span id="the-time">
-            {theDate}
-          </span>
-        </span>
+        <span>This is only updated on page load: <span id="snippet-time">should be filled</span></span>
+    </div>
+    <div data-lift="comet?type=CometTest">
+        <span>This is updated every 5s: <span id="comet-time">should be filled</span></span>
     </div>
 </body>
 </html>

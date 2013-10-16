@@ -24,10 +24,10 @@ class CometTest extends CometActor {
 
   override def lowPriority = super.lowPriority orElse {
     case Update =>
-      partialUpdate(SetHtml("the-time", new Text(theDate)) & Alert("Foo"))
+      partialUpdate(SetHtml("comet-time", new Text(theDate)))
       scheduleUpdate()
   }
 
-  def render = "#the-time *" #> theDate
+  def render = "#comet-time *" #> theDate
 
 }
