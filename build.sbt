@@ -29,7 +29,7 @@ resolvers ++= Seq(
 libraryDependencies ++= Seq(
   "net.liftweb"         %%  "lift-webkit"       % "2.5"               % "compile",
   "ch.qos.logback"      %   "logback-classic"   % "1.0.0"             % "compile",
-  "io.netty"            %   "netty-all"         % "4.0.4.Final-SNAPSHOT",
+  "io.netty"            %   "netty-all"         % "4.0.10.Final",
   "org.apache.tika"     %   "tika-parsers"      % "1.4",
   "com.google.guava"    %   "guava"             % "14.0.1"
 )

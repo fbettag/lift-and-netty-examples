@@ -1,7 +1,10 @@
 package com.something.lift.snippet
 
+import java.text.SimpleDateFormat
 import net.liftweb.util.Helpers._
+import java.util.Date
 
 class Test {
-  def render = "* *" #> "rendered from lift"
+  def theDate = new SimpleDateFormat("hh:mm:ss").format(new Date())
+  def render = "#the-time *" #> theDate
 }

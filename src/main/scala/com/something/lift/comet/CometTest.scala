@@ -24,7 +24,7 @@ class CometTest extends CometActor {
 
   override def lowPriority = super.lowPriority orElse {
     case Update =>
-      partialUpdate(SetHtml("the-time", new Text(theDate)))
+      partialUpdate(SetHtml("the-time", new Text(theDate)) & Alert("Foo"))
       scheduleUpdate()
   }
 
